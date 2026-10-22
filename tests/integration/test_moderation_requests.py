@@ -45,7 +45,7 @@ def test_invalid_json_fields_are_sanitized(client: TestClient) -> None:
         "/v1/moderations",
         json={"input": {"type": "text", "text": "sensitive content", "extra": "secret"}},
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "sensitive content" not in response.text
     assert "secret" not in response.text
     assert response.json()["detail"][0]["loc"][0] == "body"
@@ -56,7 +56,7 @@ def test_malformed_json_is_rejected(client: TestClient, body: bytes) -> None:
     response = client.post(
         "/v1/moderations", content=body, headers={"content-type": "application/json"}
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 @pytest.mark.parametrize("policy", [None, "community"])
@@ -85,7 +85,7 @@ def test_upload_is_closed_after_validation(
         files={"file": ("photo.jpg", b"image bytes", "image/jpeg")},
         data={"policy": "invalid policy"},
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert len(closed) == 1
     assert closed[0].file.closed
 
@@ -93,7 +93,7 @@ def test_upload_is_closed_after_validation(
 @pytest.mark.parametrize("field", ["file", "unexpected"])
 def test_empty_or_unknown_upload_is_rejected(client: TestClient, field: str) -> None:
     response = client.post("/v1/moderations", files={field: ("photo.jpg", b"", "image/jpeg")})
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 def test_multiple_files_are_rejected(client: TestClient) -> None:
@@ -108,7 +108,7 @@ def test_unknown_form_field_is_rejected(client: TestClient) -> None:
     response = client.post(
         "/v1/moderations", files={"file": ("a.jpg", b"a")}, data={"text": "conflict"}
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 def test_missing_multipart_boundary_is_rejected(client: TestClient) -> None:
@@ -160,7 +160,7 @@ def test_duplicate_file_and_text_field_is_rejected(client: TestClient) -> None:
     response = client.post(
         "/v1/moderations", files={"file": ("a.jpg", b"a")}, data={"file": "conflicting field"}
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 def test_body_deadline_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -225,6 +225,8 @@ def test_openapi_describes_both_encodings_and_resolves_references(client: TestCl
         "multipart/form-data",
     }
     assert "200" not in operation["responses"]
+    assert "400" in operation["responses"]
+    assert "422" not in operation["responses"]
     models = schema["components"]["schemas"]
     assert (
         models["ModerationRequest"]["properties"]["input"]["discriminator"]["propertyName"]

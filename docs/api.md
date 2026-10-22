@@ -87,12 +87,14 @@ as an identifier only; named policies are not yet loaded or applied.
 
 | Status | Meaning |
 | --- | --- |
-| `400` | Malformed multipart request or exceeded multipart field/file count |
+| `400` | Malformed JSON or multipart, invalid fields, missing/empty file, or exceeded field/file count |
 | `408` | Request body deadline exceeded |
 | `413` | Request body or uploaded file exceeds its byte limit |
 | `415` | Unsupported request content type or content encoding |
-| `422` | Invalid JSON, invalid fields, missing file, or empty file |
 | `501` | Request is valid; moderation is not implemented |
+
+`422` is reserved for media that cannot be processed, such as corrupt image bytes;
+image decoding is not implemented yet.
 
 The shared moderation result and error contracts are not finalized. Validation
 responses omit submitted field values. OpenAPI is available at `/openapi.json`

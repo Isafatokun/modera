@@ -3,7 +3,6 @@ from collections.abc import AsyncGenerator
 from typing import NoReturn
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
@@ -68,10 +67,10 @@ async def validate_upload(request: Request) -> None:
         raise HTTPException(status_code=400, detail="invalid multipart body") from exc
     try:
         if len(form.multi_items()) != len(form):
-            raise HTTPException(status_code=422, detail="duplicate form fields are not allowed")
+            raise HTTPException(status_code=400, detail="duplicate form fields are not allowed")
         upload = ImageUploadRequest.model_validate(dict(form))
         if not upload.file.size:
-            raise HTTPException(status_code=422, detail="image file must not be empty")
+            raise HTTPException(status_code=400, detail="image file must not be empty")
         if upload.file.size > MAX_IMAGE_BYTES:
             raise HTTPException(status_code=413, detail="image file is too large")
     finally:
@@ -85,11 +84,10 @@ async def validate_upload(request: Request) -> None:
     summary="Moderate text or an image",
     description="Request validation only. Valid requests return 501 until moderation is available.",
     responses={
-        400: {"description": "Malformed multipart body"},
+        400: {"description": "Malformed body or invalid request fields"},
         408: {"description": "Request body deadline exceeded"},
         413: {"description": "Request or image file exceeds its size limit"},
         415: {"description": "Unsupported request content type or content encoding"},
-        422: {"description": "Invalid request fields"},
         501: {"description": "Moderation is not implemented"},
     },
     openapi_extra={
@@ -123,7 +121,7 @@ async def moderate(request: Request) -> NoReturn:
         errors = exc.errors(include_input=False, include_context=False, include_url=False)
         for error in errors:
             error["loc"] = ("body", *error["loc"])
-        raise RequestValidationError(errors) from exc
+        raise HTTPException(status_code=400, detail=errors) from exc
     raise HTTPException(status_code=501, detail="moderation is not implemented")
 
 
