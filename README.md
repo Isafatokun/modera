@@ -2,14 +2,12 @@
 
 Text and photo moderation service.
 
-Modera is being built incrementally as a usable service and a system design study.
-This first stage provides the application foundation: configuration, health checks,
-packaging, a container definition, and automated quality checks. Moderation endpoints
-and models are not implemented yet.
+Under development. The HTTP service and health checks are available; text and photo
+moderation endpoints are not yet implemented.
 
 ## Run locally
 
-Install Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```sh
 uv sync --locked
@@ -38,8 +36,8 @@ Debug mode is disabled. Health responses contain no configuration or dependency 
 | `GET /health/live` | Confirm the process can serve an HTTP request |
 | `GET /health/ready` | Return `200` after startup and `503` outside the active lifespan |
 
-Successful checks return `{"status":"ok"}`. There are no model dependencies at this
-stage, so readiness does not yet verify model availability. Health checks are unauthenticated.
+Successful checks return `{"status":"ok"}`. Health checks are unauthenticated.
+Readiness currently checks application startup only; models are not integrated.
 
 ## Development
 
@@ -51,10 +49,8 @@ uv run --locked pytest
 uv build
 ```
 
-Application code lives in `src/modera/`. Unit tests cover settings; integration tests
-exercise the ASGI application, configuration isolation, and startup/shutdown behavior.
-`pyproject.toml` declares dependencies and tool settings. Commit `uv.lock` whenever
-dependencies change; installation with `--locked` rejects an outdated lockfile.
+Application code: `src/modera/`. Tests: `tests/unit/` and `tests/integration/`.
+Dependencies and tool settings: `pyproject.toml`. Resolved versions: `uv.lock`.
 
 ## Container
 
@@ -70,16 +66,11 @@ Uvicorn process, with access logging and forwarded-header trust disabled. Termin
 signals reach Uvicorn for graceful shutdown. Configure TLS at your deployment ingress.
 Use `/health/ready` for traffic routing and `/health/live` for process health.
 
-## Next stages
+## Roadmap
 
-1. Define the moderation API, policy configuration, and error contract.
-2. Add authentication, request limits, and secure media handling.
-3. Integrate text and photo models with bounded inference capacity and deadlines.
-4. Add metrics, dependency-failure tests, and deployment validation.
-
-Future extensions include a client SDK with typed results and bounded retries, and
-durable asynchronous moderation with persistent input storage, a queue, job status,
-idempotency, and recovery after worker restarts.
-
-Production deployment requires those service controls and validation with the real
-models. The current foundation does not accept or moderate user content.
+- Text and photo moderation with configurable policies.
+- Authentication, input limits, and secure media retrieval.
+- Bounded inference capacity, deadlines, and structured errors.
+- Operational metrics and validation with real models.
+- Client SDK with typed results and bounded retries.
+- Durable asynchronous jobs with input storage, status, idempotency, and recovery.
