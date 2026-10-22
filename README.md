@@ -2,8 +2,8 @@
 
 Text and photo moderation service.
 
-Under development. The HTTP service and health checks are available; text and photo
-moderation endpoints are not yet implemented.
+Under development. Health checks and moderation request validation are available.
+Model inference is not implemented; valid moderation requests return `501` without a decision.
 
 ## Run locally
 
@@ -16,6 +16,17 @@ curl --fail http://127.0.0.1:8000/health/ready
 ```
 
 The server binds to localhost by default. `--reload` is for development only.
+
+## API
+
+`POST /v1/moderations` accepts one text or image input:
+
+- `application/json`: text or an HTTPS image URL.
+- `multipart/form-data`: an image `file` and optional `policy`.
+
+See the [API reference](docs/api.md) for request formats and limits. Authentication,
+image decoding, policy resolution, and secure URL retrieval are not implemented yet.
+The current endpoint validates requests only.
 
 ## Configuration
 
