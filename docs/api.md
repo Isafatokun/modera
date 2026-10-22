@@ -17,7 +17,7 @@ Request validation is available. Valid requests return `501 Not Implemented`:
 ```
 
 No content is classified, no image URL is fetched, and no moderation decision is returned.
-Authentication, image decoding, and policy resolution are pending. Upload validation
+Authentication and image decoding are pending. Upload validation
 checks the request structure and byte count, not whether the bytes contain a valid image.
 
 ## JSON requests
@@ -88,8 +88,10 @@ Uploaded files are closed after request validation; they are not retained as sto
 | Policy identifier | 1–64 ASCII letters, digits, underscores, or hyphens |
 
 Body limits are enforced while reading, including requests without `Content-Length`.
-Compressed request bodies are not supported. The policy field is currently validated
-as an identifier only; named policies are not yet loaded or applied.
+Compressed request bodies are not supported. With `MODERA_POLICY_FILE` configured,
+policy names and supported input types are checked after request validation. Without
+a file, the endpoint validates the policy identifier's syntax and returns `501`.
+See [policies](policies.md) for configuration and evaluation semantics.
 
 ## Moderation result (schema only)
 
@@ -140,10 +142,11 @@ Coverage lists must be disjoint and contain no duplicates. Every evaluated categ
 must have exactly one finding. Unsupported and not-applicable categories have no scores;
 they must not be represented as zero-score findings. At least one check must be evaluated.
 
-These models validate result structure and consistency. The policy evaluator, which
-is not implemented yet, must enforce required coverage: an unsupported required check
+These models validate result structure and consistency. The policy evaluator
+enforces required coverage: an unsupported required check
 invalidates the policy/input combination; a failed required check returns an error.
 Neither condition permits an allow decision. Optional unsupported checks remain explicit.
+The evaluator is not connected to HTTP inference yet.
 
 `review` recommends human review; it does not create or store a review case. Allow
 means the configured checks passed, not that the content is guaranteed safe. Version
@@ -176,6 +179,8 @@ the broad failure; `error.code` identifies the specific condition. Do not parse
 | `invalid_json` | `400` | No |
 | `invalid_multipart` | `400` | No |
 | `unsupported_input_type` | `400` | No |
+| `unknown_policy` | `400` | No |
+| `policy_not_applicable` | `400` | No |
 | `request_timeout` | `408` | Yes |
 | `payload_too_large` | `413` | No |
 | `unsupported_media_type` | `415` | No |

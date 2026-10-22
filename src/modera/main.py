@@ -16,6 +16,7 @@ from modera.errors import (
 from modera.health import router as health_router
 from modera.moderations import register_contract_schemas
 from modera.moderations import router as moderation_router
+from modera.policies import load_policies
 
 
 @asynccontextmanager
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(HTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.state.ready = False
+    app.state.policies = load_policies(config.policy_file)
     app.include_router(health_router)
     app.include_router(moderation_router)
     register_contract_schemas(app)

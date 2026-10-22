@@ -25,15 +25,15 @@ The server binds to localhost by default. `--reload` is for development only.
 - `multipart/form-data`: an image `file` and optional `policy`.
 
 See the [API reference](docs/api.md) for request formats and limits. Authentication,
-image decoding, policy resolution, and secure URL retrieval are not implemented yet.
-The current endpoint validates requests only.
+image decoding, and secure URL retrieval are not implemented yet. The current endpoint
+validates requests and, when configured, policy selections.
 
 Errors share a stable JSON envelope with an error code, optional field name, retry
 guidance, and request ID. Every application HTTP response includes `X-Request-ID`.
 
 The [moderation result schema](docs/api.md#moderation-result-schema-only) defines
 decisions, findings, coverage, and version metadata. It is not returned until inference
-and policy evaluation are implemented.
+is connected to the policy evaluator.
 
 ## Configuration
 
@@ -44,8 +44,14 @@ not loaded automatically. `.env.example` lists the supported variables.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
+| `MODERA_POLICY_FILE` | Unset | Path to an operator-managed policy JSON file |
 
 Debug mode is disabled. Health responses contain no configuration or dependency details.
+
+[Policy configuration](docs/policies.md) supports per-category review/block thresholds,
+required coverage, and separate text/image rules. The evaluator is tested independently;
+HTTP moderation decisions remain unavailable until inference is connected. No thresholds
+are installed by default.
 
 ## Health checks
 
@@ -86,7 +92,7 @@ Use `/health/ready` for traffic routing and `/health/live` for process health.
 
 ## Roadmap
 
-- Text and photo moderation with configurable policies.
+- Text and photo model integration with policy evaluation.
 - Authentication, input limits, and secure media retrieval.
 - Bounded inference capacity, deadlines, and structured errors.
 - Operational metrics and validation with real models.

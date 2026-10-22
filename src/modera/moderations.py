@@ -10,6 +10,7 @@ from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from modera.errors import APIError, ErrorResponse, validation_error
+from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
 from modera.schemas import MAX_IMAGE_BYTES, ImageUploadRequest, ModerationRequest
 
@@ -48,14 +49,14 @@ async def limited_stream(request: Request, limit: int) -> AsyncGenerator[bytes]:
         yield chunk
 
 
-async def validate_json(request: Request) -> None:
+async def validate_json(request: Request) -> ModerationRequest:
     body = bytearray()
     async for chunk in limited_stream(request, MAX_JSON_BYTES):
         body.extend(chunk)
-    ModerationRequest.model_validate_json(body)
+    return ModerationRequest.model_validate_json(body)
 
 
-async def validate_upload(request: Request) -> None:
+async def validate_upload(request: Request) -> str:
     parser = CompleteMultipartParser(
         request.headers,
         limited_stream(request, MAX_MULTIPART_BYTES),
@@ -79,6 +80,7 @@ async def validate_upload(request: Request) -> None:
             )
         if upload.file.size > MAX_IMAGE_BYTES:
             raise APIError(413, "payload_too_large", "The image file is too large.", param="file")
+        return upload.policy
     finally:
         await form.close()
 
@@ -124,9 +126,12 @@ async def moderate(request: Request) -> NoReturn:
         async with asyncio.timeout(BODY_TIMEOUT_SECONDS):
             match media_type:
                 case "application/json":
-                    await validate_json(request)
+                    payload = await validate_json(request)
+                    policy_name = payload.policy
+                    input_type: InputType = payload.input.type
                 case "multipart/form-data":
-                    await validate_upload(request)
+                    policy_name = await validate_upload(request)
+                    input_type = "image"
                 case _:
                     raise APIError(
                         415,
@@ -140,6 +145,8 @@ async def moderate(request: Request) -> NoReturn:
         ) from exc
     except ValidationError as exc:
         raise validation_error(exc) from exc
+    if request.app.state.policies:
+        resolve_policy(request.app.state.policies, policy_name, input_type)
     raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
 
 
