@@ -24,10 +24,12 @@ def write_policy(path: Path, version: str = "1") -> None:
     )
 
 
-def test_configured_policy_selection_and_shared_errors(tmp_path: Path) -> None:
+def test_configured_policy_selection_and_shared_errors(
+    tmp_path: Path, auth_headers: dict[str, str]
+) -> None:
     path = tmp_path / "policies.json"
     write_policy(path)
-    with TestClient(create_app(Settings(policy_file=path))) as client:
+    with TestClient(create_app(Settings(policy_file=path)), headers=auth_headers) as client:
         payload = {"input": {"type": "text", "text": "hello"}}
         assert client.post("/v1/moderations", json=payload).status_code == 501
         response = client.post("/v1/moderations", json={**payload, "policy": "unknown"})

@@ -1,103 +1,53 @@
 # Moderation API
 
-`POST /v1/moderations`
+`POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
-Request validation is available. Valid requests return `501 Not Implemented`:
+Currently validates credentials, requests, and configured policy selections. Valid
+requests return `501 moderation_not_implemented`; no content is classified or fetched.
 
-```json
-{
-  "error": {
-    "code": "moderation_not_implemented",
-    "message": "Moderation is not implemented.",
-    "param": null,
-    "retryable": false,
-    "request_id": "req_0123456789abcdef0123456789abcdef"
-  }
-}
-```
+## Requests
 
-No content is classified, no image URL is fetched, and no moderation decision is returned.
-Authentication and image decoding are pending. Upload validation
-checks the request structure and byte count, not whether the bytes contain a valid image.
-
-## JSON requests
-
-Content type: `application/json`.
-
-Text:
+JSON text (`Content-Type: application/json`):
 
 ```json
-{
-  "input": {
-    "type": "text",
-    "text": "Hello everyone"
-  },
-  "policy": "default"
-}
+{"input":{"type":"text","text":"Hello everyone"},"policy":"default"}
 ```
 
-Image URL:
+JSON image URL:
 
 ```json
-{
-  "input": {
-    "type": "image",
-    "source": {
-      "type": "url",
-      "url": "https://media.example.com/photo.jpg"
-    }
-  },
-  "policy": "default"
-}
+{"input":{"type":"image","source":{"type":"url","url":"https://media.example.com/photo.jpg"}},"policy":"default"}
 ```
 
-Exactly one input is required. The `input.type` field selects its schema. Unknown fields,
-conflicting fields, base64 input, audio, video, and input arrays are rejected.
-URLs must use HTTPS and cannot contain credentials or fragments. URL syntax validation
-does not establish that a destination is safe to fetch.
-
-## File uploads
-
-Content type: `multipart/form-data`, with a boundary supplied by the HTTP client.
-
-| Field | Required | Value |
-| --- | --- | --- |
-| `file` | Yes | One non-empty image file |
-| `policy` | No | Policy identifier; defaults to `default` |
+Image file (`multipart/form-data`; let the client set the boundary):
 
 ```sh
 curl http://127.0.0.1:8000/v1/moderations \
-  -F 'file=@photo.jpg' \
-  -F 'policy=default'
+  -H "Authorization: Bearer $MODERA_API_KEY" \
+  -F 'file=@photo.jpg' -F 'policy=default'
 ```
 
-The multipart encoding implies image input. No `type` or nested `input` form field is
-needed. Text moderation uses JSON. Unknown and duplicate form fields are rejected.
-Uploaded files are closed after request validation; they are not retained as stored assets.
+One input per request. `policy` defaults to `default`. Unknown/conflicting fields,
+duplicate form fields, base64, audio, video, and batches are rejected. Image URLs
+require HTTPS and cannot contain credentials or fragments. Upload validation currently
+checks structure and size, not image contents. Files are closed after validation.
 
-## Limits
-
-| Item | Limit |
+| Limit | Value |
 | --- | --- |
-| Text | 1–4,096 Unicode characters; whitespace-only text rejected |
+| Text | 1–4,096 Unicode characters; not whitespace-only |
 | Image URL | 2,048 characters |
 | Image file | 1 byte–8 MiB |
-| Complete JSON body | 32 KiB |
-| Complete multipart body | 9 MiB, including boundaries and headers |
-| Body read and validation deadline | 15 seconds |
-| Policy identifier | 1–64 ASCII letters, digits, underscores, or hyphens |
+| Request body | 32 KiB JSON; 9 MiB multipart including headers/boundaries |
+| Body deadline | 15 seconds |
+| Policy name | 1–64 ASCII letters, digits, underscores, or hyphens |
 
-Body limits are enforced while reading, including requests without `Content-Length`.
-Compressed request bodies are not supported. With `MODERA_POLICY_FILE` configured,
-policy names and supported input types are checked after request validation. Without
-a file, the endpoint validates the policy identifier's syntax and returns `501`.
-See [policies](policies.md) for configuration and evaluation semantics.
+Body limits apply without `Content-Length`. Compressed bodies are unsupported.
+With a policy file, names and input types are checked; without one, only identifier
+syntax is validated. See [policy configuration](policies.md).
 
 ## Moderation result (schema only)
 
-`ModerationResult` defines a completed evaluation. It is included in OpenAPI components
-but is not currently returned by the endpoint. Valid requests still return `501`.
-The following scores and model identifiers are illustrative:
+Included in OpenAPI components, not returned yet. Example scores and model IDs:
 
 ```json
 {
@@ -119,89 +69,50 @@ The following scores and model identifiers are illustrative:
 }
 ```
 
-| Field | Meaning |
+Completed evaluations will return `200` for `allow`, `review`, or `block`. Review
+recommends human review; it does not create a case. Allow means the policy passed,
+not guaranteed safety. Reasons are empty for allow and required otherwise.
+
+Every evaluated category needs one finite score from 0 to 1. Unsupported and
+not-applicable categories have no scores. Coverage lists are disjoint; at least one
+check must be evaluated. Scores are model outputs, not guaranteed probabilities or
+comparable across models. Category/reason codes are extensible strings. Version
+metadata records provenance, not guaranteed reproducibility.
+
+## Errors
+
+```json
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Text must not be blank.",
+    "param": "input.text",
+    "retryable": false,
+    "request_id": "req_0123456789abcdef0123456789abcdef"
+  }
+}
+```
+
+| Status | Codes / meaning |
 | --- | --- |
-| `request_id` | Same request identifier as `X-Request-ID` |
-| `input_type` | `text` or `image`, independent of how an image was supplied |
-| `policy` | Applied policy identifier and version; the version is a string |
-| `decision.action` | `allow`, `review`, or `block` under the applied policy |
-| `decision.reasons` | Policy reason codes; empty for allow, required for review/block |
-| `findings` | One category score per evaluated check |
-| `coverage.evaluated` | Categories successfully evaluated |
-| `coverage.unsupported` | Relevant categories the selected processing cannot evaluate |
-| `coverage.not_applicable` | Categories that do not apply to this input |
-| `models` | Non-empty list of model identifiers and revisions used |
-| `preprocessing_version` | Version of the input preparation pipeline |
+| `400` | `invalid_request`, `invalid_json`, `invalid_multipart`, `unsupported_input_type`, `unknown_policy`, `policy_not_applicable` |
+| `401` | `authentication_required`; includes `WWW-Authenticate: Bearer` |
+| `404` / `405` | `not_found` / `method_not_allowed` |
+| `408` | `request_timeout`; retryable |
+| `413` | `payload_too_large` |
+| `415` | `unsupported_media_type`, `unsupported_content_encoding` |
+| `500` | `internal_error`; no decision |
+| `501` | `moderation_not_implemented`; not retryable |
+| `503` | `service_not_ready` on readiness checks; retryable, `Retry-After: 1` |
 
-Scores are finite numbers from 0 to 1. They are model outputs, not guaranteed
-probabilities or values that can be compared across models. Findings describe model
-outputs; the policy determines the action. Reason codes may identify policy rules
-rather than individual categories. Categories and reason codes are extensible strings.
+`422` is reserved for unprocessable media once decoding is implemented. Policy
+[coverage failures](policies.md) will reach clients when inference is connected.
 
-Coverage lists must be disjoint and contain no duplicates. Every evaluated category
-must have exactly one finding. Unsupported and not-applicable categories have no scores;
-they must not be represented as zero-score findings. At least one check must be evaluated.
+Use `code`, not message text, for control flow. Validation reports the first error;
+`param` is its known field/parent or `null`. Submitted values and unknown field names
+are omitted. Unexpected errors log only request ID and exception type. Errors include
+`Cache-Control: no-store`; their request ID matches the `X-Request-ID` header.
 
-These models validate result structure and consistency. The policy evaluator
-enforces required coverage: an unsupported required check
-invalidates the policy/input combination; a failed required check returns an error.
-Neither condition permits an allow decision. Optional unsupported checks remain explicit.
-The evaluator is not connected to HTTP inference yet.
-
-`review` recommends human review; it does not create or store a review case. Allow
-means the configured checks passed, not that the content is guaranteed safe. Version
-metadata records provenance; it does not alone guarantee reproducible model outputs.
-Completed allow, review, and block decisions will use HTTP `200` once implemented.
-
-## Current responses
-
-| Status | Meaning |
-| --- | --- |
-| `400` | Malformed JSON or multipart, invalid fields, missing/empty file, or exceeded field/file count |
-| `408` | Request body deadline exceeded |
-| `413` | Request body or uploaded file exceeds its byte limit |
-| `415` | Unsupported request content type or content encoding |
-| `500` | Unexpected server error; no moderation decision |
-| `501` | Request is valid; moderation is not implemented |
-
-`422` is reserved for media that cannot be processed, such as corrupt image bytes;
-image decoding is not implemented yet.
-
-## Errors and request IDs
-
-All application errors use the `error` envelope shown above. HTTP status identifies
-the broad failure; `error.code` identifies the specific condition. Do not parse
-`message` for control flow. Error responses include `Cache-Control: no-store`.
-
-| Code | Status | Retryable |
-| --- | --- | --- |
-| `invalid_request` | `400` | No |
-| `invalid_json` | `400` | No |
-| `invalid_multipart` | `400` | No |
-| `unsupported_input_type` | `400` | No |
-| `unknown_policy` | `400` | No |
-| `policy_not_applicable` | `400` | No |
-| `request_timeout` | `408` | Yes |
-| `payload_too_large` | `413` | No |
-| `unsupported_media_type` | `415` | No |
-| `unsupported_content_encoding` | `415` | No |
-| `internal_error` | `500` | No |
-| `moderation_not_implemented` | `501` | No |
-| `service_not_ready` | `503` on `/health/ready` | Yes |
-
-Validation reports the first error. `param` identifies the affected field, such as
-`input.text`, or its nearest known parent; it is `null` when no field applies.
-Submitted values and unknown field names are omitted. Unexpected server errors
-return a generic message and log only the request ID and exception type.
-
-Every application HTTP response includes a generated `X-Request-ID`. For errors,
-the same value appears in `error.request_id`. Incoming request IDs are not reused.
-Routing errors such as `404` and `405` use the same envelope with `not_found` and
-`method_not_allowed` codes; protocol headers such as `Allow` are preserved.
-
-`retryable: true` means another attempt may succeed, not that work was queued or
-that a retry will succeed. Respect `Retry-After` when present and bound retries.
-Modera does not retry or resume work automatically. Readiness failures currently
-include `Retry-After: 1`.
-
-OpenAPI is available at `/openapi.json` when `MODERA_DOCS_ENABLED=true`.
+Retryable means another attempt may succeed. Respect `Retry-After` and bound retries;
+Modera does not queue or resume work. OpenAPI: `/openapi.json` when enabled, with bearer
+authentication documented. Health checks and enabled documentation are unauthenticated.

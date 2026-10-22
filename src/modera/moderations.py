@@ -2,13 +2,14 @@ import asyncio
 from collections.abc import AsyncGenerator
 from typing import NoReturn
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from pydantic import ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
+from modera.auth import authenticate
 from modera.errors import APIError, ErrorResponse, validation_error
 from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
@@ -18,7 +19,7 @@ MAX_JSON_BYTES = 32 * 1024
 MAX_MULTIPART_BYTES = 9 * 1024 * 1024
 BODY_TIMEOUT_SECONDS = 15
 
-router = APIRouter(prefix="/v1", tags=["moderations"])
+router = APIRouter(prefix="/v1", tags=["moderations"], dependencies=[Depends(authenticate)])
 
 
 class CompleteMultipartParser(MultiPartParser):
@@ -95,6 +96,7 @@ async def validate_upload(request: Request) -> str:
         status: {"model": ErrorResponse, "description": description}
         for status, description in {
             400: "Malformed body or invalid request fields",
+            401: "Missing or invalid bearer API key",
             408: "Request body deadline exceeded",
             413: "Request or image file exceeds its size limit",
             415: "Unsupported request content type or content encoding",

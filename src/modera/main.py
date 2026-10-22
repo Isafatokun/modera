@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(HTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.state.ready = False
+    app.state.api_key = config.api_key
     app.state.policies = load_policies(config.policy_file)
     app.include_router(health_router)
     app.include_router(moderation_router)

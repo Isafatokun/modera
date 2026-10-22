@@ -34,8 +34,10 @@ from modera.main import create_app
         ),
     ],
 )
-def test_validation_error_contract(payload: object, code: str, param: str) -> None:
-    with TestClient(create_app()) as client:
+def test_validation_error_contract(
+    payload: object, code: str, param: str, auth_headers: dict[str, str]
+) -> None:
+    with TestClient(create_app(), headers=auth_headers) as client:
         response = client.post("/v1/moderations", json=payload)
     assert response.status_code == 400
     error = ErrorResponse.model_validate(response.json()).error
@@ -47,8 +49,8 @@ def test_validation_error_contract(payload: object, code: str, param: str) -> No
     assert "secret" not in response.text
 
 
-def test_malformed_json_has_no_field_or_submitted_content() -> None:
-    with TestClient(create_app()) as client:
+def test_malformed_json_has_no_field_or_submitted_content(auth_headers: dict[str, str]) -> None:
+    with TestClient(create_app(), headers=auth_headers) as client:
         response = client.post(
             "/v1/moderations", content=b'{"secret":', headers={"content-type": "application/json"}
         )

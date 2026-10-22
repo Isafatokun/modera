@@ -194,7 +194,7 @@ def test_invalid_rules_are_rejected(fields: dict[str, Any]) -> None:
 
 def test_policies_are_immutable(policy: Policy) -> None:
     with pytest.raises(ValidationError):
-        policy.text[0].block_threshold = 0.1
+        policy.text[0].block_threshold = 0.1  # type: ignore[misc]  # Verify runtime immutability.
 
 
 def test_duplicate_categories_and_ids_are_rejected(policy: Policy) -> None:

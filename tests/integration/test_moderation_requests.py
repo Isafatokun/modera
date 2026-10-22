@@ -16,8 +16,8 @@ from modera.schemas import MAX_IMAGE_BYTES
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
-    with TestClient(create_app(Settings(docs_enabled=True))) as value:
+def client(auth_headers: dict[str, str]) -> Iterator[TestClient]:
+    with TestClient(create_app(Settings(docs_enabled=True)), headers=auth_headers) as value:
         yield value
 
 
@@ -166,7 +166,9 @@ def test_duplicate_file_and_text_field_is_rejected(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_body_deadline_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_body_deadline_is_enforced(
+    monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
     monkeypatch.setattr(moderations, "BODY_TIMEOUT_SECONDS", 0.01)
 
     async def scenario() -> None:
@@ -176,7 +178,9 @@ def test_body_deadline_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
             yield b'{"type":"text","text":"hello"}}'
 
         async with AsyncClient(
-            transport=ASGITransport(app=create_app()), base_url="http://testserver"
+            transport=ASGITransport(app=create_app()),
+            base_url="http://testserver",
+            headers=auth_headers,
         ) as client:
             response = await client.post(
                 "/v1/moderations", content=body(), headers={"content-type": "application/json"}

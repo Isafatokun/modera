@@ -40,13 +40,44 @@ jobs:
         with:
           persist-credentials: false
       - run: docker build -t modera:ci .
-      - run: >-
-          docker run -d --name modera --read-only --cap-drop=ALL
-          --security-opt=no-new-privileges --tmpfs /tmp
-          -p 127.0.0.1:8000:8000 modera:ci
+      - run: |
+          export MODERA_API_KEY="$(openssl rand -hex 32)"
+          docker run -d --name modera --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges --tmpfs /tmp \
+            -e MODERA_API_KEY -p 127.0.0.1:8000:8000 modera:ci
       - run: >-
           curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1
           --retry-max-time 30 --max-time 2 http://127.0.0.1:8000/health/ready
+      - name: Verify container authentication
+        run: |
+          docker exec -i modera python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          for authenticated, status, code in [
+              (False, 401, "authentication_required"),
+              (True, 501, "moderation_not_implemented"),
+          ]:
+              headers = {"Content-Type": "application/json"}
+              if authenticated:
+                  headers["Authorization"] = "Bearer " + os.environ["MODERA_API_KEY"]
+              request = urllib.request.Request(
+                  "http://127.0.0.1:8000/v1/moderations",
+                  data=b'{"input":{"type":"text","text":"hello"}}', headers=headers,
+              )
+              try:
+                  urllib.request.urlopen(request, timeout=5)
+              except urllib.error.HTTPError as response:
+                  assert response.code == status
+                  body = json.load(response)["error"]
+                  assert body["code"] == code
+                  assert body["request_id"] == response.headers["X-Request-ID"]
+              else:
+                  raise AssertionError("expected an error response")
+          print("Container authentication checks passed")
+          PY
       - if: always()
         run: docker logs modera
       - if: always()

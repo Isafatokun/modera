@@ -38,6 +38,7 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 python_version = "3.12"
 strict = true
 files = ["src", "tests"]

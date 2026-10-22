@@ -2,66 +2,59 @@
 
 Text and photo moderation service.
 
-Under development. Health checks and moderation request validation are available.
-Model inference is not implemented; valid moderation requests return `501` without a decision.
+Under development: authentication, request validation, result schemas, and policy
+configuration are available. Inference is not connected; valid requests return `501`.
 
-## Run locally
+## Run
 
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```sh
 uv sync --locked
+export MODERA_API_KEY="$(uv run --locked python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 uv run --locked uvicorn modera.main:create_app --factory --reload
-curl --fail http://127.0.0.1:8000/health/ready
 ```
 
-The server binds to localhost by default. `--reload` is for development only.
-
-## API
-
-`POST /v1/moderations` accepts one text or image input:
-
-- `application/json`: text or an HTTPS image URL.
-- `multipart/form-data`: an image `file` and optional `policy`.
-
-See the [API reference](docs/api.md) for request formats and limits. Authentication,
-image decoding, and secure URL retrieval are not implemented yet. The current endpoint
-validates requests and, when configured, policy selections.
-
-Errors share a stable JSON envelope with an error code, optional field name, retry
-guidance, and request ID. Every application HTTP response includes `X-Request-ID`.
-
-The [moderation result schema](docs/api.md#moderation-result-schema-only) defines
-decisions, findings, coverage, and version metadata. It is not returned until inference
-is connected to the policy evaluator.
+The server binds to localhost. Use `--reload` only for development.
 
 ## Configuration
 
-Settings are validated when the application is created. Invalid values stop startup.
-Set environment variables in your shell or deployment environment; `.env` files are
-not loaded automatically. `.env.example` lists the supported variables.
-
 | Variable | Default | Purpose |
 | --- | --- | --- |
+| `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
-| `MODERA_POLICY_FILE` | Unset | Path to an operator-managed policy JSON file |
+| `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
 
-Debug mode is disabled. Health responses contain no configuration or dependency details.
+Set variables through the shell or your deployment's secret manager. `.env` files
+are not loaded automatically. Missing/invalid keys and invalid policy files prevent
+startup. Generate a random key for each deployment; never commit it or embed it in
+browser/mobile code. Use HTTPS at the deployment ingress. Rotation requires replacing
+the secret and restarting instances and callers that use it.
 
-[Policy configuration](docs/policies.md) supports per-category review/block thresholds,
-required coverage, and separate text/image rules. The evaluator is tested independently;
-HTTP moderation decisions remain unavailable until inference is connected. No thresholds
-are installed by default.
+## API
 
-## Health checks
+`POST /v1/moderations` requires `Authorization: Bearer <key>`. It accepts JSON text,
+a JSON image URL, or a multipart image file. See [requests, results, and errors](docs/api.md).
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /health/live` | Confirm the process can serve an HTTP request |
-| `GET /health/ready` | Return `200` after startup and `503` outside the active lifespan |
+[Policies](docs/policies.md) control category thresholds and required checks. No
+thresholds are installed by default. Authentication and policy selection work today;
+image decoding, URL retrieval, and inference are pending.
 
-Successful checks return `{"status":"ok"}`. Health checks are unauthenticated.
-Readiness currently checks application startup only; models are not integrated.
+Health checks need no credentials: `/health/live` checks HTTP availability;
+`/health/ready` checks startup, not model availability. Successful checks return
+`{"status":"ok"}`. Every application HTTP response includes `X-Request-ID`.
+
+## Container
+
+```sh
+docker build -t modera:local .
+docker run --rm --init --read-only --cap-drop=ALL \
+  --security-opt=no-new-privileges --tmpfs /tmp -e MODERA_API_KEY \
+  -p 127.0.0.1:8000:8000 modera:local
+```
+
+Runs as a non-root user with runtime dependencies only. Access logging and proxy
+header trust are disabled. Mount policy files read-only when configured.
 
 ## Development
 
@@ -73,28 +66,10 @@ uv run --locked pytest
 uv build
 ```
 
-Application code: `src/modera/`. Tests: `tests/unit/` and `tests/integration/`.
-Dependencies and tool settings: `pyproject.toml`. Resolved versions: `uv.lock`.
-
-## Container
-
-```sh
-docker build -t modera:local .
-docker run --rm --init --read-only --cap-drop=ALL \
-  --security-opt=no-new-privileges --tmpfs /tmp \
-  -p 127.0.0.1:8000:8000 modera:local
-```
-
-The image uses a non-root user and installs only runtime dependencies. It runs one
-Uvicorn process, with access logging and forwarded-header trust disabled. Termination
-signals reach Uvicorn for graceful shutdown. Configure TLS at your deployment ingress.
-Use `/health/ready` for traffic routing and `/health/live` for process health.
+Code: `src/modera/`. Tests: `tests/unit/`, `tests/integration/`.
+Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap
 
-- Text and photo model integration with policy evaluation.
-- Authentication, input limits, and secure media retrieval.
-- Bounded inference capacity, deadlines, and structured errors.
-- Operational metrics and validation with real models.
-- Client SDK with typed results and bounded retries.
-- Durable asynchronous jobs with input storage, status, idempotency, and recovery.
+Secure media handling, bounded model inference, and operational metrics. Later:
+a client SDK with bounded retries and durable asynchronous moderation jobs.
