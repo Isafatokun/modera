@@ -1,10 +1,12 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from tempfile import SpooledTemporaryFile
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import ASGITransport, AsyncClient
+from starlette import formparsers
 from starlette.datastructures import UploadFile
 
 from modera import moderations
@@ -114,6 +116,44 @@ def test_missing_multipart_boundary_is_rejected(client: TestClient) -> None:
         "/v1/moderations", content=b"invalid", headers={"content-type": "multipart/form-data"}
     )
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize("ending", [b"", b"--b", b"--b\r\n"])
+def test_truncated_policy_does_not_silently_use_default(client: TestClient, ending: bytes) -> None:
+    body = (
+        b'--b\r\nContent-Disposition: form-data; name="file"; filename="a.jpg"\r\n'
+        b"Content-Type: image/jpeg\r\n\r\nimage bytes\r\n"
+        b'--b\r\nContent-Disposition: form-data; name="policy"\r\n\r\ncommunity\r\n' + ending
+    )
+    response = client.post(
+        "/v1/moderations", content=body, headers={"content-type": "multipart/form-data; boundary=b"}
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "invalid multipart body"}
+
+
+@pytest.mark.parametrize("ending", [b"", b"\r\n--b\r\n"])
+def test_truncated_upload_is_closed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, ending: bytes
+) -> None:
+    files: list[SpooledTemporaryFile[bytes]] = []
+
+    def create_file(max_size: int) -> SpooledTemporaryFile[bytes]:
+        file = SpooledTemporaryFile(max_size=max_size)  # noqa: SIM115 — parser owns file lifetime
+        files.append(file)
+        return file
+
+    monkeypatch.setattr(formparsers, "SpooledTemporaryFile", create_file)
+    body = (
+        b'--b\r\nContent-Disposition: form-data; name="file"; filename="a.jpg"\r\n'
+        b"\r\nimage bytes" + ending
+    )
+    response = client.post(
+        "/v1/moderations", content=body, headers={"content-type": "multipart/form-data; boundary=b"}
+    )
+    assert response.status_code == 400
+    assert len(files) == 1
+    assert files[0].closed
 
 
 def test_duplicate_file_and_text_field_is_rejected(client: TestClient) -> None:

@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
+from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from modera.schemas import MAX_IMAGE_BYTES, ImageUploadRequest, ModerationRequest
@@ -16,6 +17,25 @@ MAX_MULTIPART_BYTES = 9 * 1024 * 1024
 BODY_TIMEOUT_SECONDS = 15
 
 router = APIRouter(prefix="/v1", tags=["moderations"])
+
+
+class CompleteMultipartParser(MultiPartParser):
+    complete = False
+
+    def on_end(self) -> None:
+        self.complete = True
+
+    async def parse(self) -> FormData:
+        stream = self.stream
+
+        async def checked_stream() -> AsyncGenerator[bytes]:
+            async for chunk in stream:
+                yield chunk
+            if not self.complete:
+                raise MultiPartException("incomplete multipart body")
+
+        self.stream = checked_stream()
+        return await super().parse()
 
 
 async def limited_stream(request: Request, limit: int) -> AsyncGenerator[bytes]:
@@ -35,7 +55,7 @@ async def validate_json(request: Request) -> None:
 
 
 async def validate_upload(request: Request) -> None:
-    parser = MultiPartParser(
+    parser = CompleteMultipartParser(
         request.headers,
         limited_stream(request, MAX_MULTIPART_BYTES),
         max_files=1,
