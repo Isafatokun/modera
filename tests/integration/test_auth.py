@@ -27,11 +27,13 @@ def test_missing_or_invalid_credentials_are_rejected(
     assert "wrong-key" not in response.text + caplog.text
 
 
-def test_valid_key_authorizes_json_and_file_upload(auth_headers: dict[str, str]) -> None:
+def test_valid_key_authorizes_json_and_file_upload(
+    auth_headers: dict[str, str], image_bytes: bytes
+) -> None:
     with TestClient(create_app(), headers=auth_headers) as client:
         response = client.post("/v1/moderations", json={"input": {"type": "text", "text": "hello"}})
         assert response.status_code == 501
-        response = client.post("/v1/moderations", files={"file": ("photo.jpg", b"image bytes")})
+        response = client.post("/v1/moderations", files={"file": ("photo.jpg", image_bytes)})
         assert response.status_code == 501
 
 

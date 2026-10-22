@@ -14,6 +14,7 @@ from modera.errors import (
     validation_error_handler,
 )
 from modera.health import router as health_router
+from modera.images import ImageValidator
 from modera.moderations import register_contract_schemas
 from modera.moderations import router as moderation_router
 from modera.policies import load_policies
@@ -21,11 +22,14 @@ from modera.policies import load_policies
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.images = ImageValidator()
     app.state.ready = True
     try:
         yield
     finally:
         app.state.ready = False
+        app.state.images.close()
+        app.state.images = None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -45,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.ready = False
     app.state.api_key = config.api_key
     app.state.policies = load_policies(config.policy_file)
+    app.state.images = None
     app.include_router(health_router)
     app.include_router(moderation_router)
     register_contract_schemas(app)

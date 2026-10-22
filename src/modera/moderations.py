@@ -57,7 +57,7 @@ async def validate_json(request: Request) -> ModerationRequest:
     return ModerationRequest.model_validate_json(body)
 
 
-async def validate_upload(request: Request) -> str:
+async def validate_upload(request: Request) -> tuple[str, bytes]:
     parser = CompleteMultipartParser(
         request.headers,
         limited_stream(request, MAX_MULTIPART_BYTES),
@@ -81,7 +81,7 @@ async def validate_upload(request: Request) -> str:
             )
         if upload.file.size > MAX_IMAGE_BYTES:
             raise APIError(413, "payload_too_large", "The image file is too large.", param="file")
-        return upload.policy
+        return upload.policy, await upload.file.read(MAX_IMAGE_BYTES + 1)
     finally:
         await form.close()
 
@@ -100,6 +100,8 @@ async def validate_upload(request: Request) -> str:
             408: "Request body deadline exceeded",
             413: "Request or image file exceeds its size limit",
             415: "Unsupported request content type or content encoding",
+            422: "Image data could not be decoded",
+            503: "Image validation is busy or exceeded its deadline",
             501: "Moderation is not implemented",
         }.items()
     },
@@ -132,7 +134,7 @@ async def moderate(request: Request) -> NoReturn:
                     policy_name = payload.policy
                     input_type: InputType = payload.input.type
                 case "multipart/form-data":
-                    policy_name = await validate_upload(request)
+                    policy_name, image_data = await validate_upload(request)
                     input_type = "image"
                 case _:
                     raise APIError(
@@ -149,6 +151,17 @@ async def moderate(request: Request) -> NoReturn:
         raise validation_error(exc) from exc
     if request.app.state.policies:
         resolve_policy(request.app.state.policies, policy_name, input_type)
+    if media_type == "multipart/form-data":
+        validator = request.app.state.images
+        if validator is None:
+            raise APIError(
+                503,
+                "service_not_ready",
+                "The service is not ready.",
+                retryable=True,
+                headers={"Retry-After": "1"},
+            )
+        await validator.validate(image_data)
     raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
 
 

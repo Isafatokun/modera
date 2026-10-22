@@ -63,10 +63,10 @@ def test_malformed_json_is_rejected(client: TestClient, body: bytes) -> None:
 
 
 @pytest.mark.parametrize("policy", [None, "community"])
-def test_file_upload_contract(client: TestClient, policy: str | None) -> None:
+def test_file_upload_contract(client: TestClient, policy: str | None, image_bytes: bytes) -> None:
     response = client.post(
         "/v1/moderations",
-        files={"file": ("photo.jpg", b"image bytes", "image/jpeg")},
+        files={"file": ("photo.jpg", image_bytes, "image/jpeg")},
         data={"policy": policy} if policy else {},
     )
     assert response.status_code == 501
@@ -191,8 +191,9 @@ def test_body_deadline_is_enforced(
 
 
 @pytest.mark.parametrize("size,status", [(MAX_IMAGE_BYTES, 501), (MAX_IMAGE_BYTES + 1, 413)])
-def test_file_size_boundary(client: TestClient, size: int, status: int) -> None:
-    response = client.post("/v1/moderations", files={"file": ("a.jpg", b"a" * size)})
+def test_file_size_boundary(client: TestClient, size: int, status: int, image_bytes: bytes) -> None:
+    data = image_bytes + b"\0" * (size - len(image_bytes))
+    response = client.post("/v1/moderations", files={"file": ("a.jpg", data)})
     assert response.status_code == status
 
 
@@ -233,7 +234,7 @@ def test_openapi_describes_both_encodings_and_resolves_references(client: TestCl
     }
     assert "200" not in operation["responses"]
     assert "400" in operation["responses"]
-    assert "422" not in operation["responses"]
+    assert "422" in operation["responses"]
     models = schema["components"]["schemas"]
     assert "ModerationResult" in models
     assert models["Decision"]["properties"]["action"]["enum"] == ["allow", "review", "block"]

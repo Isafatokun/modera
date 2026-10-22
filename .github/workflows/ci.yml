@@ -53,8 +53,10 @@ jobs:
           docker exec -i modera python - <<'PY'
           import json
           import os
+          from io import BytesIO
           import urllib.error
           import urllib.request
+          from PIL import Image
 
           for authenticated, status, code in [
               (False, 401, "authentication_required"),
@@ -77,6 +79,27 @@ jobs:
               else:
                   raise AssertionError("expected an error response")
           print("Container authentication checks passed")
+          for image_format in ("JPEG", "PNG", "WEBP"):
+              with BytesIO() as buffer, Image.new("RGB", (2, 2), "white") as image:
+                  image.save(buffer, format=image_format)
+                  data = buffer.getvalue()
+              body = (
+                  b'--smoke\r\nContent-Disposition: form-data; name="file"; filename="image"\r\n'
+                  b'Content-Type: application/octet-stream\r\n\r\n' + data + b'\r\n--smoke--\r\n'
+              )
+              request = urllib.request.Request(
+                  "http://127.0.0.1:8000/v1/moderations", data=body,
+                  headers={"Authorization": "Bearer " + os.environ["MODERA_API_KEY"],
+                           "Content-Type": "multipart/form-data; boundary=smoke"},
+              )
+              try:
+                  urllib.request.urlopen(request, timeout=10)
+              except urllib.error.HTTPError as response:
+                  assert response.code == 501
+                  assert json.load(response)["error"]["code"] == "moderation_not_implemented"
+              else:
+                  raise AssertionError("expected moderation to remain unimplemented")
+          print("Container image codec checks passed")
           PY
       - if: always()
         run: docker logs modera

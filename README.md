@@ -2,8 +2,8 @@
 
 Text and photo moderation service.
 
-Under development: authentication, request validation, result schemas, and policy
-configuration are available. Inference is not connected; valid requests return `501`.
+Under development: authentication, request and image validation, result schemas,
+and policy configuration are available. Inference is not connected; valid requests return `501`.
 
 ## Run
 
@@ -38,7 +38,7 @@ a JSON image URL, or a multipart image file. See [requests, results, and errors]
 
 [Policies](docs/policies.md) control category thresholds and required checks. No
 thresholds are installed by default. Authentication and policy selection work today;
-image decoding, URL retrieval, and inference are pending.
+URL retrieval and inference are pending.
 
 Health checks need no credentials: `/health/live` checks HTTP availability;
 `/health/ready` checks startup, not model availability. Successful checks return
@@ -71,5 +71,5 @@ Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap
 
-Secure media handling, bounded model inference, and operational metrics. Later:
+Secure URL retrieval, bounded model inference, and operational metrics. Later:
 a client SDK with bounded retries and durable asynchronous moderation jobs.

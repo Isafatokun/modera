@@ -29,21 +29,26 @@ curl http://127.0.0.1:8000/v1/moderations \
 
 One input per request. `policy` defaults to `default`. Unknown/conflicting fields,
 duplicate form fields, base64, audio, video, and batches are rejected. Image URLs
-require HTTPS and cannot contain credentials or fragments. Upload validation currently
-checks structure and size, not image contents. Files are closed after validation.
+require HTTPS and cannot contain credentials or fragments; they are not fetched yet.
+Uploads must decode as still JPEG, PNG, or WebP. Filename and MIME type are not trusted.
+Files are closed after reading; image data is not retained as a stored asset.
 
 | Limit | Value |
 | --- | --- |
 | Text | 1–4,096 Unicode characters; not whitespace-only |
 | Image URL | 2,048 characters |
 | Image file | 1 byte–8 MiB |
+| Decoded image | 16 million pixels |
 | Request body | 32 KiB JSON; 9 MiB multipart including headers/boundaries |
-| Body deadline | 15 seconds |
+| Deadlines | 15 seconds for the body; 5 seconds for image validation |
 | Policy name | 1–64 ASCII letters, digits, underscores, or hyphens |
 
 Body limits apply without `Content-Length`. Compressed bodies are unsupported.
 With a policy file, names and input types are checked; without one, only identifier
 syntax is validated. See [policy configuration](policies.md).
+
+Image decoding runs off the event loop, one job per instance with no decode queue.
+Timed-out native work keeps its slot until completion; excess work returns retryable `503`.
 
 ## Moderation result (schema only)
 
@@ -99,14 +104,14 @@ metadata records provenance, not guaranteed reproducibility.
 | `401` | `authentication_required`; includes `WWW-Authenticate: Bearer` |
 | `404` / `405` | `not_found` / `method_not_allowed` |
 | `408` | `request_timeout`; retryable |
-| `413` | `payload_too_large` |
-| `415` | `unsupported_media_type`, `unsupported_content_encoding` |
+| `413` | `payload_too_large`, `image_too_large` |
+| `415` | `unsupported_media_type`, `unsupported_content_encoding`, `unsupported_image_format`, `animated_image_not_supported` |
+| `422` | `invalid_image`; recognized image format with corrupt/undecodable data |
 | `500` | `internal_error`; no decision |
 | `501` | `moderation_not_implemented`; not retryable |
-| `503` | `service_not_ready` on readiness checks; retryable, `Retry-After: 1` |
+| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`; retryable, `Retry-After: 1` |
 
-`422` is reserved for unprocessable media once decoding is implemented. Policy
-[coverage failures](policies.md) will reach clients when inference is connected.
+Policy [coverage failures](policies.md) will reach clients when inference is connected.
 
 Use `code`, not message text, for control flow. Validation reports the first error;
 `param` is its known field/parent or `null`. Submitted values and unknown field names
