@@ -28,6 +28,9 @@ See the [API reference](docs/api.md) for request formats and limits. Authenticat
 image decoding, policy resolution, and secure URL retrieval are not implemented yet.
 The current endpoint validates requests only.
 
+Errors share a stable JSON envelope with an error code, optional field name, retry
+guidance, and request ID. Every application HTTP response includes `X-Request-ID`.
+
 ## Configuration
 
 Settings are validated when the application is created. Invalid values stop startup.

@@ -2,13 +2,14 @@ import asyncio
 from collections.abc import AsyncGenerator
 from typing import NoReturn
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, Request
 from pydantic import ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
+from modera.errors import APIError, ErrorResponse, validation_error
 from modera.schemas import MAX_IMAGE_BYTES, ImageUploadRequest, ModerationRequest
 
 MAX_JSON_BYTES = 32 * 1024
@@ -42,7 +43,7 @@ async def limited_stream(request: Request, limit: int) -> AsyncGenerator[bytes]:
     async for chunk in request.stream():
         received += len(chunk)
         if received > limit:
-            raise HTTPException(status_code=413, detail="request body is too large")
+            raise APIError(413, "payload_too_large", "The request body is too large.")
         yield chunk
 
 
@@ -64,15 +65,19 @@ async def validate_upload(request: Request) -> None:
     try:
         form = await parser.parse()
     except (MultiPartException, MultipartParseError) as exc:
-        raise HTTPException(status_code=400, detail="invalid multipart body") from exc
+        raise APIError(
+            400, "invalid_multipart", "The multipart body is invalid or incomplete."
+        ) from exc
     try:
         if len(form.multi_items()) != len(form):
-            raise HTTPException(status_code=400, detail="duplicate form fields are not allowed")
+            raise APIError(400, "invalid_request", "Duplicate form fields are not allowed.")
         upload = ImageUploadRequest.model_validate(dict(form))
         if not upload.file.size:
-            raise HTTPException(status_code=400, detail="image file must not be empty")
+            raise APIError(
+                400, "invalid_request", "The image file must not be empty.", param="file"
+            )
         if upload.file.size > MAX_IMAGE_BYTES:
-            raise HTTPException(status_code=413, detail="image file is too large")
+            raise APIError(413, "payload_too_large", "The image file is too large.", param="file")
     finally:
         await form.close()
 
@@ -84,11 +89,14 @@ async def validate_upload(request: Request) -> None:
     summary="Moderate text or an image",
     description="Request validation only. Valid requests return 501 until moderation is available.",
     responses={
-        400: {"description": "Malformed body or invalid request fields"},
-        408: {"description": "Request body deadline exceeded"},
-        413: {"description": "Request or image file exceeds its size limit"},
-        415: {"description": "Unsupported request content type or content encoding"},
-        501: {"description": "Moderation is not implemented"},
+        status: {"model": ErrorResponse, "description": description}
+        for status, description in {
+            400: "Malformed body or invalid request fields",
+            408: "Request body deadline exceeded",
+            413: "Request or image file exceeds its size limit",
+            415: "Unsupported request content type or content encoding",
+            501: "Moderation is not implemented",
+        }.items()
     },
     openapi_extra={
         "requestBody": {
@@ -104,7 +112,12 @@ async def validate_upload(request: Request) -> None:
 )
 async def moderate(request: Request) -> NoReturn:
     if request.headers.get("content-encoding", "identity").lower() != "identity":
-        raise HTTPException(status_code=415, detail="content encoding is not supported")
+        raise APIError(
+            415,
+            "unsupported_content_encoding",
+            "Content encoding is not supported.",
+            headers={"Accept-Encoding": "identity"},
+        )
     media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
     try:
         async with asyncio.timeout(BODY_TIMEOUT_SECONDS):
@@ -114,15 +127,19 @@ async def moderate(request: Request) -> NoReturn:
                 case "multipart/form-data":
                     await validate_upload(request)
                 case _:
-                    raise HTTPException(status_code=415, detail="content type is not supported")
+                    raise APIError(
+                        415,
+                        "unsupported_media_type",
+                        "The request content type is not supported.",
+                        headers={"Accept": "application/json, multipart/form-data"},
+                    )
     except TimeoutError as exc:
-        raise HTTPException(status_code=408, detail="request body deadline exceeded") from exc
+        raise APIError(
+            408, "request_timeout", "The request body deadline was exceeded.", retryable=True
+        ) from exc
     except ValidationError as exc:
-        errors = exc.errors(include_input=False, include_context=False, include_url=False)
-        for error in errors:
-            error["loc"] = ("body", *error["loc"])
-        raise HTTPException(status_code=400, detail=errors) from exc
-    raise HTTPException(status_code=501, detail="moderation is not implemented")
+        raise validation_error(exc) from exc
+    raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
 
 
 def register_request_schemas(app: FastAPI) -> None:

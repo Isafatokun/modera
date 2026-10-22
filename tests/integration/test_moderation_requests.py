@@ -37,7 +37,9 @@ def client() -> Iterator[TestClient]:
 def test_valid_json_has_no_moderation_verdict(client: TestClient, payload: object) -> None:
     response = client.post("/v1/moderations", json=payload)
     assert response.status_code == 501
-    assert response.json() == {"detail": "moderation is not implemented"}
+    assert response.json()["error"]["code"] == "moderation_not_implemented"
+    assert response.json()["error"]["retryable"] is False
+    assert "decision" not in response.json()
 
 
 def test_invalid_json_fields_are_sanitized(client: TestClient) -> None:
@@ -48,7 +50,8 @@ def test_invalid_json_fields_are_sanitized(client: TestClient) -> None:
     assert response.status_code == 400
     assert "sensitive content" not in response.text
     assert "secret" not in response.text
-    assert response.json()["detail"][0]["loc"][0] == "body"
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert response.json()["error"]["param"] == "input"
 
 
 @pytest.mark.parametrize("body", [b"", b"{", b"null", b"[]"])
@@ -129,7 +132,7 @@ def test_truncated_policy_does_not_silently_use_default(client: TestClient, endi
         "/v1/moderations", content=body, headers={"content-type": "multipart/form-data; boundary=b"}
     )
     assert response.status_code == 400
-    assert response.json() == {"detail": "invalid multipart body"}
+    assert response.json()["error"]["code"] == "invalid_multipart"
 
 
 @pytest.mark.parametrize("ending", [b"", b"\r\n--b\r\n"])
