@@ -14,7 +14,7 @@ from modera.errors import (
     validation_error_handler,
 )
 from modera.health import router as health_router
-from modera.moderations import register_request_schemas
+from modera.moderations import register_contract_schemas
 from modera.moderations import router as moderation_router
 
 
@@ -44,5 +44,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.ready = False
     app.include_router(health_router)
     app.include_router(moderation_router)
-    register_request_schemas(app)
+    register_contract_schemas(app)
     return app

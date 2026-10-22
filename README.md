@@ -31,6 +31,10 @@ The current endpoint validates requests only.
 Errors share a stable JSON envelope with an error code, optional field name, retry
 guidance, and request ID. Every application HTTP response includes `X-Request-ID`.
 
+The [moderation result schema](docs/api.md#moderation-result-schema-only) defines
+decisions, findings, coverage, and version metadata. It is not returned until inference
+and policy evaluation are implemented.
+
 ## Configuration
 
 Settings are validated when the application is created. Invalid values stop startup.

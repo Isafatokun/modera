@@ -10,6 +10,7 @@ from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from modera.errors import APIError, ErrorResponse, validation_error
+from modera.results import ModerationResult
 from modera.schemas import MAX_IMAGE_BYTES, ImageUploadRequest, ModerationRequest
 
 MAX_JSON_BYTES = 32 * 1024
@@ -142,9 +143,13 @@ async def moderate(request: Request) -> NoReturn:
     raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
 
 
-def register_request_schemas(app: FastAPI) -> None:
+def register_contract_schemas(app: FastAPI) -> None:
     _, definitions = models_json_schema(
-        [(ModerationRequest, "validation"), (ImageUploadRequest, "validation")],
+        [
+            (ModerationRequest, "validation"),
+            (ImageUploadRequest, "validation"),
+            (ModerationResult, "serialization"),
+        ],
         ref_template="#/components/schemas/{model}",
     )
     app.openapi().setdefault("components", {}).setdefault("schemas", {}).update(

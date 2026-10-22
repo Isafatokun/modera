@@ -91,6 +91,65 @@ Body limits are enforced while reading, including requests without `Content-Leng
 Compressed request bodies are not supported. The policy field is currently validated
 as an identifier only; named policies are not yet loaded or applied.
 
+## Moderation result (schema only)
+
+`ModerationResult` defines a completed evaluation. It is included in OpenAPI components
+but is not currently returned by the endpoint. Valid requests still return `501`.
+The following scores and model identifiers are illustrative:
+
+```json
+{
+  "request_id": "req_0123456789abcdef0123456789abcdef",
+  "input_type": "image",
+  "policy": {"id": "default", "version": "1"},
+  "decision": {"action": "review", "reasons": ["violence"]},
+  "findings": [
+    {"category": "violence", "score": 0.62},
+    {"category": "sexual", "score": 0.01}
+  ],
+  "coverage": {
+    "evaluated": ["violence", "sexual"],
+    "unsupported": ["hate"],
+    "not_applicable": []
+  },
+  "models": [{"id": "image-classifier", "revision": "example-1"}],
+  "preprocessing_version": "image-v1"
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `request_id` | Same request identifier as `X-Request-ID` |
+| `input_type` | `text` or `image`, independent of how an image was supplied |
+| `policy` | Applied policy identifier and version; the version is a string |
+| `decision.action` | `allow`, `review`, or `block` under the applied policy |
+| `decision.reasons` | Policy reason codes; empty for allow, required for review/block |
+| `findings` | One category score per evaluated check |
+| `coverage.evaluated` | Categories successfully evaluated |
+| `coverage.unsupported` | Relevant categories the selected processing cannot evaluate |
+| `coverage.not_applicable` | Categories that do not apply to this input |
+| `models` | Non-empty list of model identifiers and revisions used |
+| `preprocessing_version` | Version of the input preparation pipeline |
+
+Scores are finite numbers from 0 to 1. They are model outputs, not guaranteed
+probabilities or values that can be compared across models. Findings describe model
+outputs; the policy determines the action. Reason codes may identify policy rules
+rather than individual categories. Categories and reason codes are extensible strings.
+
+Coverage lists must be disjoint and contain no duplicates. Every evaluated category
+must have exactly one finding. Unsupported and not-applicable categories have no scores;
+they must not be represented as zero-score findings. At least one check must be evaluated.
+
+These models validate result structure and consistency. The policy evaluator, which
+is not implemented yet, must enforce required coverage: an unsupported required check
+invalidates the policy/input combination; a failed required check returns an error.
+Neither condition permits an allow decision. Optional unsupported checks remain explicit.
+
+`review` recommends human review; it does not create or store a review case. Allow
+means the configured checks passed, not that the content is guaranteed safe. Version
+metadata records provenance; it does not alone guarantee reproducible model outputs.
+Completed allow, review, and block decisions will use HTTP `200` once implemented.
+
 ## Current responses
 
 | Status | Meaning |

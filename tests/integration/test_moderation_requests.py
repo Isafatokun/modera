@@ -231,6 +231,8 @@ def test_openapi_describes_both_encodings_and_resolves_references(client: TestCl
     assert "400" in operation["responses"]
     assert "422" not in operation["responses"]
     models = schema["components"]["schemas"]
+    assert "ModerationResult" in models
+    assert models["Decision"]["properties"]["action"]["enum"] == ["allow", "review", "block"]
     assert (
         models["ModerationRequest"]["properties"]["input"]["discriminator"]["propertyName"]
         == "type"
