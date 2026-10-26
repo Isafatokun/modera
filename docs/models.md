@@ -28,7 +28,7 @@ limit returns `422 input_too_long`; content is never silently truncated.
 Only models needed by the selected policy run on a request; rules-only policies
 do not depend on model inference. Weights load once at startup, on CPU, from the
 local cache only. Loading requires safetensors and disables remote model code.
-Models warm before readiness; missing
+Models load and warm on their serving workers before readiness; missing
 weights, incompatible architecture and invalid label mappings normally fail startup.
 Telemetry is disabled before importing inference libraries. Inference uses one slot
 per modality per process, with no waiting queue. Text and photos can run concurrently,

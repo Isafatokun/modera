@@ -138,11 +138,11 @@ class InferenceWorker:
         self._closed = False
         self._timeout = timeout
 
-    def _release(self, _future: Future[list[Finding]]) -> None:
+    def _release[T](self, _future: Future[T]) -> None:
         with self._lock:
             self._busy = False
 
-    async def run(self, operation: Callable[[], list[Finding]]) -> list[Finding]:
+    def _submit[T](self, operation: Callable[[], T]) -> Future[T]:
         with self._lock:
             if self._busy or self._closed:
                 raise APIError(
@@ -159,6 +159,13 @@ class InferenceWorker:
                 self._busy = False
                 raise
         future.add_done_callback(self._release)
+        return future
+
+    async def initialize[T](self, operation: Callable[[], T]) -> T:
+        return await asyncio.wrap_future(self._submit(operation))
+
+    async def run(self, operation: Callable[[], list[Finding]]) -> list[Finding]:
+        future = self._submit(operation)
         try:
             async with asyncio.timeout(self._timeout):
                 return await asyncio.wrap_future(future)

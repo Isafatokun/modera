@@ -1,11 +1,47 @@
 import asyncio
-from threading import Event
+from threading import Event, get_ident
 
 import pytest
 
 from modera.errors import APIError
 from modera.inference import InferenceWorker
 from modera.results import Finding
+
+
+def test_initialization_warms_the_serving_thread_without_request_deadline() -> None:
+    entered = Event()
+    release = Event()
+
+    def initialize() -> int:
+        entered.set()
+        if not release.wait(5):
+            raise TimeoutError("test did not release initialization")
+        return get_ident()
+
+    async def scenario() -> None:
+        worker = InferenceWorker(0.01)
+        task = asyncio.create_task(worker.initialize(initialize))
+        try:
+            assert await asyncio.to_thread(entered.wait, 2)
+            await asyncio.sleep(0.03)
+            assert not task.done()
+            with pytest.raises(APIError) as busy:
+                await worker.run(lambda: [])
+            assert busy.value.code == "service_busy"
+            release.set()
+            thread = await task
+
+            def predict() -> list[Finding]:
+                assert get_ident() == thread
+                return []
+
+            assert await worker.run(predict) == []
+        finally:
+            release.set()
+            await asyncio.gather(task, return_exceptions=True)
+            worker.close()
+
+    asyncio.run(scenario())
 
 
 def test_inference_timeout_keeps_capacity_until_native_work_finishes() -> None:

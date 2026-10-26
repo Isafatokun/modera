@@ -1,7 +1,7 @@
 import asyncio
 from collections import Counter
 from pathlib import Path
-from threading import Event
+from threading import Event, get_ident
 from typing import Literal
 
 import pytest
@@ -35,9 +35,11 @@ def test_modalities_have_independent_bounded_capacity(
         ) -> None:
             self.kind = "text" if isinstance(settings, TextModelSettings) else "image"
             self.category = next(iter(settings.label_map.values()))
+            self.thread = get_ident()
             loads[self.kind] += 1
 
         def predict(self, content: str | bytes) -> list[Finding]:
+            assert get_ident() == self.thread
             if self.kind == blocked_kind:
                 entered.set()
                 if not release.wait(10):

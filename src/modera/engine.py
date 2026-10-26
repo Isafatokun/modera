@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import json
 import logging
@@ -87,8 +86,8 @@ class ModerationEngine:
             ):
                 raise ValueError("models require explicit non-rules category mappings")
             try:
-                adapter = await asyncio.to_thread(
-                    Classifier, selection, self._settings.inference_threads
+                adapter = await self._workers[kind].initialize(
+                    partial(Classifier, selection, self._settings.inference_threads)
                 )
             except Exception as exc:
                 if (
