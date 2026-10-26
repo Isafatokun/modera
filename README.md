@@ -79,6 +79,7 @@ uv build
 ```
 
 Code: `src/modera/`. Tests: `tests/unit/`, `tests/integration/`.
+Optional [capacity benchmarks](benchmarks/README.md) run with real models.
 Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap

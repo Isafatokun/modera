@@ -25,6 +25,10 @@ inference = [
 ]
 
 [dependency-groups]
+benchmark = [
+    "httpx2>=2.16.0",
+    "numpy>=2,<3",
+]
 dev = [
     "httpx2>=2.16.0",
     "mypy>=1.0,<2",

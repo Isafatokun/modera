@@ -385,6 +385,10 @@ inference = [
 ]
 
 [package.dev-dependencies]
+benchmark = [
+    { name = "httpx2" },
+    { name = "numpy" },
+]
 dev = [
     { name = "httpx2" },
     { name = "mypy" },
@@ -407,6 +411,10 @@ requires-dist = [
 provides-extras = ["inference"]
 
 [package.metadata.requires-dev]
+benchmark = [
+    { name = "httpx2", specifier = ">=2.16.0" },
+    { name = "numpy", specifier = ">=2,<3" },
+]
 dev = [
     { name = "httpx2", specifier = ">=2.16.0" },
     { name = "mypy", specifier = ">=1.0,<2" },

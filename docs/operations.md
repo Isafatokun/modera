@@ -42,3 +42,4 @@ does not bound connections or bytes buffered by the HTTP server or proxy.
 
 Integration tests exercise concurrent request saturation, rejection, cancellation,
 and recovery. They verify behavior, not deployment throughput or model capacity.
+For real-model HTTP measurements, run the [capacity benchmark](../benchmarks/README.md).
