@@ -258,7 +258,7 @@ def test_openapi_describes_both_encodings_and_resolves_references(
         "application/json",
         "multipart/form-data",
     }
-    assert "200" not in operation["responses"]
+    assert "200" in operation["responses"]
     assert "400" in operation["responses"]
     assert "422" in operation["responses"]
     models = schema["components"]["schemas"]

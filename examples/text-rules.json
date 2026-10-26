@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "rules": [
+    {
+      "category": "rules.prohibited_terms",
+      "phrases": ["example prohibited phrase"]
+    }
+  ]
+}

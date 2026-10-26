@@ -6,7 +6,8 @@ ENV UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN uv sync --locked --no-dev --no-editable
+ARG INFERENCE=false
+RUN if [ "$INFERENCE" = "true" ]; then uv sync --locked --no-dev --no-editable --extra inference; else uv sync --locked --no-dev --no-editable; fi
 
 FROM python:3.12-slim AS runtime
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1

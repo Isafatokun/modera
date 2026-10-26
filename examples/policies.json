@@ -4,11 +4,17 @@
       "id": "default",
       "version": "1",
       "text": [
-        {"category": "violence", "review_threshold": 0.5, "block_threshold": 0.85}
+        {"category": "toxicity", "review_threshold": 0.5, "block_threshold": 0.85}
       ],
       "image": [
-        {"category": "sexual", "review_threshold": 0.5, "block_threshold": 0.85},
-        {"category": "violence", "review_threshold": 0.5, "block_threshold": 0.85}
+        {"category": "sexual", "review_threshold": 0.5, "block_threshold": 0.85}
+      ]
+    },
+    {
+      "id": "rules-only",
+      "version": "1",
+      "text": [
+        {"category": "rules.prohibited_terms", "block_threshold": 1.0}
       ]
     }
   ]

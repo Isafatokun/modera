@@ -1,10 +1,12 @@
 import re
 from pathlib import Path
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from modera.model_config import ImageModelSettings, TextModelSettings
+from modera.schemas import PolicyName
 
 
 class Settings(BaseSettings):
@@ -21,6 +23,11 @@ class Settings(BaseSettings):
     text_model: TextModelSettings | None = None
     image_model: ImageModelSettings | None = None
     policy_file: Path | None = None
+    text_rules_file: Path | None = None
+    text_fallback: Literal["error", "rules"] = "error"
+    text_fallback_policy: PolicyName | None = None
+    inference_threads: Annotated[int, Field(ge=1, le=32)] = 2
+    inference_timeout_seconds: Annotated[float, Field(gt=0, le=60)] = 5.0
     image_allowed_hosts: tuple[str, ...] = ()
 
     @field_validator("image_allowed_hosts")

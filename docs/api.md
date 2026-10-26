@@ -2,8 +2,8 @@
 
 `POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
-Currently validates credentials, requests, and configured policy selections. Valid
-requests return `501 moderation_not_implemented`; no content is classified.
+Configured backends return a policy decision. A modality with no model or rules
+backend returns `501 moderation_not_implemented`. See [model setup](models.md).
 
 ## Requests
 
@@ -46,6 +46,7 @@ Files are closed after reading; image data is not retained as a stored asset.
 | Deadlines | 15 seconds for the body; 5 seconds for image validation |
 | Downloads | 4 per instance, no waiting queue; 20-second total deadline |
 | Download recovery | At most 2 attempts; 8 seconds each, 3-second inactivity timeout |
+| Inference | One slot/process; default 5-second deadline; text model defaults to 256 tokens |
 | Policy name | 1–64 ASCII letters, digits, underscores, or hyphens |
 
 Body limits apply without `Content-Length`. Compressed bodies are unsupported.
@@ -61,9 +62,9 @@ failures are not retried. Longer source `Retry-After` delays are returned to the
 instead of waiting inside the request. This is request-scoped recovery; progress does not survive
 a service restart.
 
-## Moderation result (schema only)
+## Moderation result
 
-Included in OpenAPI components, not returned yet. Example scores and model IDs:
+Example scores and model IDs:
 
 ```json
 {
@@ -85,7 +86,7 @@ Included in OpenAPI components, not returned yet. Example scores and model IDs:
 }
 ```
 
-Completed evaluations will return `200` for `allow`, `review`, or `block`. Review
+Completed evaluations return `200` for `allow`, `review`, or `block`. Review
 recommends human review; it does not create a case. Allow means the policy passed,
 not guaranteed safety. Reasons are empty for allow and required otherwise.
 
@@ -94,6 +95,12 @@ not-applicable categories have no scores. Coverage lists are disjoint; at least 
 check must be evaluated. Scores are model outputs, not guaranteed probabilities or
 comparable across models. Category/reason codes are extensible strings. Version
 metadata records provenance, not guaranteed reproducibility.
+
+Each finding includes `source: "model"` or `"rules"`. Rule results include
+`rules_version`; `models` lists only models that completed evaluation and can be empty
+for rules-only results. `fallback: true` identifies degraded evaluation; `policy`
+records the policy actually used. The preprocessing version fingerprints model
+settings, label mappings, and rule configuration. See [fallback semantics](models.md).
 
 ## Errors
 
@@ -111,18 +118,18 @@ metadata records provenance, not guaranteed reproducibility.
 
 | Status | Codes / meaning |
 | --- | --- |
-| `400` | `invalid_request`, `invalid_json`, `invalid_multipart`, `unsupported_input_type`, `unknown_policy`, `policy_not_applicable`, `image_url_not_allowed` |
+| `400` | `invalid_request`, `invalid_json`, `invalid_multipart`, `unsupported_input_type`, `unknown_policy`, `policy_not_applicable`, `policy_unsupported`, `image_url_not_allowed` |
 | `401` | `authentication_required`; includes `WWW-Authenticate: Bearer` |
 | `404` / `405` | `not_found` / `method_not_allowed` |
 | `408` | `request_timeout`; retryable |
 | `413` | `payload_too_large`, `image_too_large` |
 | `415` | `unsupported_media_type`, `unsupported_content_encoding`, `unsupported_image_format`, `animated_image_not_supported` |
-| `422` | `invalid_image` (undecodable data), `input_fetch_rejected` (source rejection, redirect, invalid response, or TLS failure) |
+| `422` | `input_too_long` (model token limit), `invalid_image` (undecodable data), `input_fetch_rejected` (source rejection, redirect, invalid response, or TLS failure) |
 | `500` | `internal_error`; no decision |
-| `501` | `moderation_not_implemented`; not retryable |
-| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`, `input_fetch_failed`; retryable, `Retry-After: 1` |
+| `501` | `moderation_not_implemented`; no backend configured, not retryable |
+| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`, `input_fetch_failed`, `check_unavailable`; retryable, `Retry-After: 1` |
 
-Policy [coverage failures](policies.md) will reach clients when inference is connected.
+Policy [coverage failures](policies.md) return errors rather than an allow decision.
 
 Use `code`, not message text, for control flow. Validation reports the first error;
 `param` is its known field/parent or `null`. Submitted values and unknown field names

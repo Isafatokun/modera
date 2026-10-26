@@ -34,8 +34,9 @@ its decision. Evaluation does not run models, store results, or create review ca
 
 Failed checks are not unsupported checks. Missing results cause errors, even for
 optional rules or when another category already triggers block. Inconsistent findings
-are an internal error, never allow. Model capability checks at startup await inference
-integration; the HTTP endpoint does not yet produce evaluation decisions or failures.
+are an internal error, never allow. Models declare their mapped categories; rules
+declare only `rules.*` categories. Explicit [fallback policies](models.md) are recorded
+under their own ID/version, rather than claiming the original policy completed.
 
 ## Deployment
 
@@ -44,6 +45,5 @@ Each application keeps an immutable snapshot; restart/redeploy after changes and
 the version. Versions are operator-assigned; there is no stored policy history.
 Mount files read-only in containers. The example is not included in the runtime image.
 
-No file or thresholds are installed by default. Without a file, requests receive
-syntax validation only; configured policy selections are checked when a file is loaded.
-Valid authenticated requests still return `501` until inference is connected.
+No file or thresholds are installed by default. Configuring any moderation backend
+requires a policy file; unconfigured modalities return `501`.

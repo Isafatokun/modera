@@ -43,6 +43,7 @@ class Decision(ResultModel):
 class Finding(ResultModel):
     category: Category
     score: Score
+    source: Literal["model", "rules"] = "model"
 
 
 class Coverage(ResultModel):
@@ -65,11 +66,24 @@ class ModerationResult(ResultModel):
     decision: Decision
     findings: Annotated[list[Finding], Field(min_length=1)]
     coverage: Coverage
-    models: Annotated[list[ModelVersion], Field(min_length=1)]
+    models: list[ModelVersion]
+    rules_version: Version | None = None
+    fallback: bool = False
     preprocessing_version: Version
 
     @model_validator(mode="after")
     def validate_findings(self) -> Self:
+        if not self.models and self.rules_version is None:
+            raise ValueError("a result requires model or rules provenance")
+        if (
+            any(f.source == "rules" for f in self.findings)
+            and self.rules_version is None
+        ):
+            raise ValueError("rules findings require a rules version")
+        if any(f.source == "model" for f in self.findings) and not self.models:
+            raise ValueError("model findings require model provenance")
+        if self.fallback and self.rules_version is None:
+            raise ValueError("fallback requires rules provenance")
         categories = [finding.category for finding in self.findings]
         if len(categories) != len(set(categories)):
             raise ValueError("finding categories must be unique")

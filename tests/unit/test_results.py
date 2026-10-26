@@ -146,7 +146,7 @@ def test_categories_and_policy_reasons_are_extensible(payload: dict[str, Any]) -
 
 def test_documented_result_matches_the_schema() -> None:
     reference = Path(__file__).resolve().parents[2] / "docs" / "api.md"
-    section = reference.read_text().split("## Moderation result (schema only)", 1)[1]
+    section = reference.read_text().split("## Moderation result", 1)[1]
     example = section.split("```json\n", 1)[1].split("```", 1)[0]
     result = ModerationResult.model_validate(json.loads(example))
     assert result.decision.action == "review"

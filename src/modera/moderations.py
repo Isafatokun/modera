@@ -1,8 +1,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
-from typing import NoReturn
 
-from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from pydantic import ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
@@ -10,6 +9,7 @@ from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from modera.auth import authenticate
+from modera.engine import ModerationEngine
 from modera.errors import APIError, ErrorResponse, validation_error
 from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
@@ -102,13 +102,10 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
 
 @router.post(
     "/moderations",
-    status_code=501,
-    response_model=None,
+    status_code=200,
+    response_model=ModerationResult,
     summary="Moderate text or an image",
-    description=(
-        "Request validation only. "
-        "Valid requests return 501 until moderation is available."
-    ),
+    description=("Evaluate text or an image using the configured backends and policy."),
     responses={
         status: {"model": ErrorResponse, "description": description}
         for status, description in {
@@ -119,7 +116,7 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
             415: "Unsupported request content type or content encoding",
             422: "Image data is invalid or the source rejected retrieval",
             503: "Image processing is busy or the source is temporarily unavailable",
-            501: "Moderation is not implemented",
+            501: "No moderation backend is configured for this input",
         }.items()
     },
     openapi_extra={
@@ -136,7 +133,9 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
         }
     },
 )
-async def moderate(request: Request) -> NoReturn:
+async def moderate(request: Request, response: Response) -> ModerationResult:
+    response.headers["Cache-Control"] = "no-store"
+    content: str | bytes = ""
     if request.headers.get("content-encoding", "identity").lower() != "identity":
         raise APIError(
             415,
@@ -154,6 +153,8 @@ async def moderate(request: Request) -> NoReturn:
                     payload = await validate_json(request)
                     policy_name = payload.policy
                     input_type: InputType = payload.input.type
+                    if payload.input.type == "text":
+                        content = payload.input.text
                 case "multipart/form-data":
                     policy_name, image_data = await validate_upload(request)
                     input_type = "image"
@@ -200,7 +201,16 @@ async def moderate(request: Request) -> NoReturn:
             if is_url and exc.param == "file":
                 exc.param = "input.source.url"
             raise
-    raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
+        content = image_data
+    engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
+    if engine is None or not engine.enabled(input_type):
+        raise APIError(
+            501,
+            "moderation_not_implemented",
+            "No moderation backend is configured for this input.",
+        )
+    policy = resolve_policy(request.app.state.policies, policy_name, input_type)
+    return await engine.evaluate(input_type, content, policy, request.state.request_id)
 
 
 def register_contract_schemas(app: FastAPI) -> None:

@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException
 
 from modera.config import Settings
 from modera.downloads import ImageDownloader
+from modera.engine import ModerationEngine
 from modera.errors import (
     ErrorResponse,
     RequestContextMiddleware,
@@ -23,13 +24,16 @@ from modera.policies import load_policies
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.engine = ModerationEngine(app.state.settings, app.state.policies)
     app.state.images = ImageValidator()
     app.state.downloads = ImageDownloader(app.state.image_allowed_hosts)
-    app.state.ready = True
     try:
+        await app.state.engine.start()
+        app.state.ready = True
         yield
     finally:
         app.state.ready = False
+        app.state.engine.close()
         await app.state.downloads.close()
         app.state.downloads = None
         app.state.images.close()
@@ -53,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(HTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.state.ready = False
+    app.state.settings = config
     app.state.api_key = config.api_key
     app.state.text_model = config.text_model
     app.state.image_model = config.image_model

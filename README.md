@@ -2,9 +2,9 @@
 
 Text and photo moderation service.
 
-Under development: authentication, request and image validation, result schemas,
-URL retrieval, and policy configuration are available. Inference is not connected;
-valid requests return `501`.
+A synchronous API with replaceable text/photo classifiers, configurable policies,
+optional text rules, and explicit failure handling. Models and policies are operator
+configured; an unconfigured modality returns `501`.
 
 ## Run
 
@@ -35,16 +35,9 @@ startup. Generate a random key for each deployment; never commit it or embed it 
 browser/mobile code. Use HTTPS at the deployment ingress. Rotation requires replacing
 the secret and restarting instances and callers that use it.
 
-Model selections default to unset. Set `__ID` to a model repository and
-`__REVISION` to its full 40-character commit SHA; see [.env.example](.env.example).
-`MODERA_TEXT_MODEL__BACKEND` defaults to `transformers_sequence_classification`;
-`MODERA_IMAGE_MODEL__BACKEND` defaults to `transformers_image_classification`.
-Repository IDs are configurable, rather than restricted to particular vendors.
-Incomplete selections, mutable revisions such as `main`, and unknown backends fail
-validation. Changes require a restart. Different architectures need an adapter;
-compatible model replacements will still need output/category and policy validation.
-Inference adapters are pending: configuration currently loads no weights and
-requests continue to return `501` after validation.
+Model selections default to unset. Configure repository ID, pinned revision and label
+mapping; see [models, replacement, and rules fallback](docs/models.md). Classifier
+weights must be prepared before startup. Rules-only deployments need no ML packages.
 
 ## API
 
@@ -52,11 +45,10 @@ requests continue to return `501` after validation.
 a JSON image URL, or a multipart image file. See [requests, results, and errors](docs/api.md).
 
 [Policies](docs/policies.md) control category thresholds and required checks. No
-thresholds are installed by default. Authentication and policy selection work today;
-URL retrieval requires an explicit host allowlist; inference is pending.
+thresholds are installed by default. URL retrieval requires an explicit host allowlist.
 
 Health checks need no credentials: `/health/live` checks HTTP availability;
-`/health/ready` checks startup, not model availability. Successful checks return
+`/health/ready` checks readiness for the configured model/rules mode. Successful checks return
 `{"status":"ok"}`. Every application HTTP response includes `X-Request-ID`.
 
 ## Container
@@ -86,5 +78,5 @@ Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap
 
-Bounded model inference and operational metrics. Later:
-a client SDK with bounded retries and durable asynchronous moderation jobs.
+Operational metrics, additional inference adapters, a client SDK with bounded retries,
+and durable asynchronous moderation jobs.
