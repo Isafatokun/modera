@@ -18,6 +18,7 @@ class Classifier:
     def __init__(
         self, settings: TextModelSettings | ImageModelSettings, threads: int
     ) -> None:
+        settings = settings.model_copy(deep=True)
         if not settings.label_map:
             raise ValueError("configured models require explicit label mappings")
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"

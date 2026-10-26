@@ -8,6 +8,7 @@ from python_multipart.exceptions import MultipartParseError
 from starlette.datastructures import FormData
 from starlette.formparsers import MultiPartException, MultiPartParser
 
+from modera.admission import admit_request
 from modera.auth import authenticate
 from modera.engine import ModerationEngine
 from modera.errors import APIError, ErrorResponse, validation_error
@@ -25,7 +26,9 @@ MAX_MULTIPART_BYTES = 9 * 1024 * 1024
 BODY_TIMEOUT_SECONDS = 15
 
 router = APIRouter(
-    prefix="/v1", tags=["moderations"], dependencies=[Depends(authenticate)]
+    prefix="/v1",
+    tags=["moderations"],
+    dependencies=[Depends(authenticate), Depends(admit_request)],
 )
 
 
@@ -203,7 +206,15 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
             raise
         content = image_data
     engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
-    if engine is None or not engine.enabled(input_type):
+    if engine is None or not request.app.state.ready:
+        raise APIError(
+            503,
+            "service_not_ready",
+            "The service is not ready.",
+            retryable=True,
+            headers={"Retry-After": "1"},
+        )
+    if not engine.enabled(input_type):
         raise APIError(
             501,
             "moderation_not_implemented",

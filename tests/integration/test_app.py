@@ -53,3 +53,31 @@ def test_bad_settings_prevent_app_creation(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("MODERA_DOCS_ENABLED", "invalid")
     with pytest.raises(ValidationError):
         create_app()
+
+
+def test_partial_startup_failure_closes_already_created_resources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import modera.main as main
+    from modera.engine import ModerationEngine
+
+    closed: list[bool] = []
+    original = ModerationEngine.close
+
+    def close(value: ModerationEngine) -> None:
+        original(value)
+        closed.append(True)
+
+    def invalid_images() -> None:
+        raise RuntimeError("required image codecs are unavailable")
+
+    monkeypatch.setattr(ModerationEngine, "close", close)
+    monkeypatch.setattr(main, "ImageValidator", invalid_images)
+    app = create_app()
+    with pytest.raises(RuntimeError, match="image codecs"), TestClient(app):
+        pass
+    assert closed == [True]
+    assert not app.state.ready
+    assert app.state.engine is None
+    assert app.state.images is None
+    assert app.state.downloads is None

@@ -289,3 +289,63 @@ def test_openapi_describes_both_encodings_and_resolves_references(
                 check_refs(nested)
 
     check_refs(schema)
+
+
+@pytest.mark.parametrize("failure", ["limit", "timeout", "cancel"])
+def test_interrupted_uploads_close_temporary_files(
+    monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str], failure: str
+) -> None:
+    files: list[SpooledTemporaryFile[bytes]] = []
+    created = asyncio.Event()
+
+    def create_file(max_size: int) -> SpooledTemporaryFile[bytes]:
+        file = SpooledTemporaryFile(max_size=1)  # noqa: SIM115
+        files.append(file)
+        created.set()
+        return file
+
+    monkeypatch.setattr(formparsers, "SpooledTemporaryFile", create_file)
+    monkeypatch.setattr(moderations, "MAX_MULTIPART_BYTES", 2048)
+    if failure == "timeout":
+        monkeypatch.setattr(moderations, "BODY_TIMEOUT_SECONDS", 0.02)
+
+    async def scenario() -> None:
+        async def body() -> AsyncIterator[bytes]:
+            yield (
+                b'--b\r\nContent-Disposition: form-data; name="file"; '
+                b'filename="a.png"\r\n\r\n' + b"x" * 1024
+            )
+            if failure == "limit":
+                yield b"x" * 2048
+            else:
+                await asyncio.sleep(1)
+            yield b"\r\n--b--\r\n"
+
+        app = create_app()
+        async with (
+            app.router.lifespan_context(app),
+            AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://testserver",
+                headers=auth_headers,
+            ) as client,
+        ):
+            task = asyncio.create_task(
+                client.post(
+                    "/v1/moderations",
+                    content=body(),
+                    headers={"Content-Type": "multipart/form-data; boundary=b"},
+                )
+            )
+            if failure == "cancel":
+                await asyncio.wait_for(created.wait(), 1)
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+            else:
+                response = await task
+                assert response.status_code == (413 if failure == "limit" else 408)
+        assert len(files) == 1
+        assert files[0].closed
+
+    asyncio.run(scenario())

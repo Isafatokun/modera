@@ -143,7 +143,7 @@ def test_rules_fallback_does_not_satisfy_failed_model_checks(
         )
         assert response.status_code == expected
         if expected == 200:
-            assert response.json()["fallback"]
+            assert not response.json()["fallback"]
             assert response.json()["models"] == []
             assert response.json()["coverage"]["evaluated"] == ["rules.blocklist"]
         else:
@@ -157,7 +157,7 @@ def test_model_failure_has_no_automatic_rules_fallback(
 ) -> None:
     monkeypatch.setattr(engine, "Classifier", FakeClassifier)
     settings = Settings(
-        **configuration(tmp_path),
+        **configuration(tmp_path, model_required=True),
         text_model=TextModelSettings(
             id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
         ),
@@ -177,7 +177,7 @@ def test_startup_failure_requires_explicit_fallback(
     def unavailable(
         settings: TextModelSettings | ImageModelSettings, threads: int
     ) -> FakeClassifier:
-        raise RuntimeError("private model path")
+        raise OSError("private model path")
 
     monkeypatch.setattr(engine, "Classifier", unavailable)
     values = configuration(tmp_path)
@@ -197,7 +197,7 @@ def test_startup_failure_requires_explicit_fallback(
             "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
         )
         assert response.status_code == 200
-        assert response.json()["fallback"]
+        assert not response.json()["fallback"]
 
 
 def test_inference_requires_policy_and_fallback_requires_rules() -> None:
@@ -276,3 +276,125 @@ def test_fallback_policy_cannot_claim_model_checks(tmp_path: Path) -> None:
         ),
     ):
         pass
+
+
+def test_rules_cannot_return_decisions_after_shutdown(
+    tmp_path: Path, auth_headers: dict[str, str]
+) -> None:
+    app = create_app(Settings(**configuration(tmp_path)))
+    with TestClient(app, headers=auth_headers) as client:
+        assert (
+            client.post(
+                "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+            ).status_code
+            == 200
+        )
+    response = client.post(
+        "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "service_not_ready"
+
+
+def test_rules_only_policy_does_not_run_an_unrelated_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    settings = Settings(
+        **configuration(tmp_path),
+        text_model=TextModelSettings(
+            id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+        ),
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        monkeypatch.setattr(FakeClassifier, "fail", True)
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 200
+    assert response.json()["models"] == []
+    assert not response.json()["fallback"]
+
+
+def test_accepted_long_model_id_can_be_returned_in_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    name = "example/" + "m" * 140
+    settings = Settings(
+        **configuration(tmp_path, model_required=True),
+        text_model=TextModelSettings(
+            id=name, revision=REVISION, label_map={"toxic": "toxicity"}
+        ),
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 200
+    assert response.json()["models"][0]["id"] == name
+
+
+def test_rules_fallback_does_not_hide_invalid_classifier_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def invalid(
+        settings: TextModelSettings | ImageModelSettings, threads: int
+    ) -> FakeClassifier:
+        raise ValueError("label mappings do not match the model outputs")
+
+    monkeypatch.setattr(engine, "Classifier", invalid)
+    settings = Settings(
+        **configuration(tmp_path),
+        text_model=TextModelSettings(
+            id="example/model", revision=REVISION, label_map={"wrong": "toxicity"}
+        ),
+        text_fallback="rules",
+    )
+    with (
+        pytest.raises(RuntimeError, match="configured classifier"),
+        TestClient(create_app(settings)),
+    ):
+        pass
+
+
+def test_engine_keeps_an_independent_model_configuration_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    selection = TextModelSettings(
+        id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+    )
+    app = create_app(
+        Settings(**configuration(tmp_path, model_required=True), text_model=selection)
+    )
+    with TestClient(app, headers=auth_headers) as client:
+        selection.label_map["toxic"] = "different_category"
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 200
+    assert "toxicity" in response.json()["coverage"]["evaluated"]
+
+
+def test_unsupported_policy_is_rejected_before_model_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    paths = configuration(tmp_path, model_required=True)
+    data = json.loads(paths["policy_file"].read_text())
+    data["policies"][0]["text"].append({"category": "violence", "block_threshold": 0.9})
+    paths["policy_file"].write_text(json.dumps(data))
+    settings = Settings(
+        **paths,
+        text_model=TextModelSettings(
+            id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+        ),
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        monkeypatch.setattr(FakeClassifier, "fail", True)
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "policy_unsupported"

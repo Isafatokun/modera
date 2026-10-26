@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ModerationEngine:
     def __init__(self, settings: Settings, policies: Mapping[str, Policy]) -> None:
+        settings = settings.model_copy(deep=True)
         self._settings = settings
         self._rules = load_rules(settings.text_rules_file)
         self._policies = policies
@@ -87,7 +88,11 @@ class ModerationEngine:
                     Classifier, selection, self._settings.inference_threads
                 )
             except Exception as exc:
-                if kind == "text" and self._settings.text_fallback == "rules":
+                if (
+                    kind == "text"
+                    and self._settings.text_fallback == "rules"
+                    and isinstance(exc, (OSError, ImportError))
+                ):
                     logger.warning(
                         "Text model unavailable; rules fallback enabled: type=%s",
                         type(exc).__name__,
@@ -121,10 +126,30 @@ class ModerationEngine:
             else []
         )
         capabilities = {finding.category for finding in findings}
-        models: list[ModelVersion] = []
-        fallback = False
         if selection is not None:
             capabilities.update(selection.label_map.values())
+        policy_rules = policy.rules_for(input_type)
+        if any(
+            rule.required and rule.category not in capabilities for rule in policy_rules
+        ):
+            raise APIError(
+                400,
+                "policy_unsupported",
+                "A required policy check cannot evaluate this input.",
+                param="policy",
+            )
+        if not any(rule.category in capabilities for rule in policy_rules):
+            raise APIError(
+                400,
+                "policy_not_applicable",
+                "No policy checks apply to this input.",
+                param="policy",
+            )
+        models: list[ModelVersion] = []
+        fallback = False
+        if selection is not None and any(
+            rule.category in selection.label_map.values() for rule in policy_rules
+        ):
             try:
                 if adapter is None:
                     raise APIError(

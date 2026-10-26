@@ -21,7 +21,7 @@ class PolicyVersion(ResultModel):
 
 
 class ModelVersion(ResultModel):
-    id: Annotated[str, Field(min_length=1, max_length=128, pattern=r"^\S+$")]
+    id: Annotated[str, Field(min_length=1, max_length=200, pattern=r"^\S+$")]
     revision: Version
 
 

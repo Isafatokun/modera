@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     text_rules_file: Path | None = None
     text_fallback: Literal["error", "rules"] = "error"
     text_fallback_policy: PolicyName | None = None
+    max_in_flight_requests: Annotated[int, Field(ge=1, le=256)] = 8
     inference_threads: Annotated[int, Field(ge=1, le=32)] = 2
     inference_timeout_seconds: Annotated[float, Field(gt=0, le=60)] = 5.0
     image_allowed_hosts: tuple[str, ...] = ()

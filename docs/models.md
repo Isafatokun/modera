@@ -25,7 +25,8 @@ Text defaults to sigmoid and 256 tokens; photos default to softmax. Override
 `MODERA_IMAGE_MODEL__ACTIVATION` to match the selected model. Text beyond the token
 limit returns `422 input_too_long`; content is never silently truncated.
 
-Weights load once at startup, on CPU, from the local cache only. Loading requires
+Only models needed by the selected policy run on a request; rules-only policies
+do not depend on model inference. Weights load once at startup, on CPU, from the local cache only. Loading requires
 safetensors and disables remote model code. Models warm before readiness; missing
 weights, incompatible architecture and invalid label mappings normally fail startup.
 Telemetry is disabled before importing inference libraries. Inference uses one slot
@@ -66,8 +67,10 @@ version appear in `policy`, alongside `fallback: true` and `models: []`. This se
 applies to all text requests when inference is unavailable. Without an explicit
 fallback policy, the requested policy still applies: missing model checks return
 `503`, even if no rule matched. Invalid input never triggers model fallback.
-Readiness permits a failed text model only when rules fallback is explicitly enabled;
-photo-model startup failures remain fatal. Restart to retry loading a failed model.
+Readiness permits unavailable cached text weights or missing inference dependencies
+only when rules fallback is explicitly enabled. Invalid classifier configuration
+(including label mappings) and photo-model startup failures remain fatal. Restart to
+retry loading an unavailable model.
 
 If Modera itself is unreachable, it cannot run fallback. The caller must retry, keep
 content pending, or explicitly run its own reduced rules policy. A local rules result

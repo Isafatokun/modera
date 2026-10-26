@@ -42,6 +42,7 @@ Files are closed after reading; image data is not retained as a stored asset.
 | Image URL | 2,048 characters |
 | Image file | 1 byte–8 MiB |
 | Decoded image | 16 million pixels |
+| Active moderation requests | 8/process by default; excess requests get `503` before body parsing |
 | Request body | 32 KiB JSON; 9 MiB multipart including headers/boundaries |
 | Deadlines | 15 seconds for the body; 5 seconds for image validation |
 | Downloads | 4 per instance, no waiting queue; 20-second total deadline |

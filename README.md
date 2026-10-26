@@ -23,6 +23,7 @@ The server binds to localhost. Use `--reload` only for development.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
+| `MODERA_MAX_IN_FLIGHT_REQUESTS` | `8` | Maximum active moderation requests per process; no waiting queue |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
 | `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
 | `MODERA_TEXT_MODEL__ID` / `__REVISION` | Unset | Text model ID and full commit SHA |
