@@ -3,7 +3,8 @@
 Text and photo moderation service.
 
 Under development: authentication, request and image validation, result schemas,
-and policy configuration are available. Inference is not connected; valid requests return `501`.
+URL retrieval, and policy configuration are available. Inference is not connected;
+valid requests return `501`.
 
 ## Run
 
@@ -24,6 +25,7 @@ The server binds to localhost. Use `--reload` only for development.
 | `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
 | `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
+| `MODERA_IMAGE_ALLOWED_HOSTS` | `[]` | JSON array of exact DNS hostnames allowed for image downloads |
 
 Set variables through the shell or your deployment's secret manager. `.env` files
 are not loaded automatically. Missing/invalid keys and invalid policy files prevent
@@ -38,7 +40,7 @@ a JSON image URL, or a multipart image file. See [requests, results, and errors]
 
 [Policies](docs/policies.md) control category thresholds and required checks. No
 thresholds are installed by default. Authentication and policy selection work today;
-URL retrieval and inference are pending.
+URL retrieval requires an explicit host allowlist; inference is pending.
 
 Health checks need no credentials: `/health/live` checks HTTP availability;
 `/health/ready` checks startup, not model availability. Successful checks return
@@ -71,5 +73,5 @@ Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap
 
-Secure URL retrieval, bounded model inference, and operational metrics. Later:
+Bounded model inference and operational metrics. Later:
 a client SDK with bounded retries and durable asynchronous moderation jobs.

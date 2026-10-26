@@ -13,7 +13,7 @@ from modera.auth import authenticate
 from modera.errors import APIError, ErrorResponse, validation_error
 from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
-from modera.schemas import MAX_IMAGE_BYTES, ImageUploadRequest, ModerationRequest
+from modera.schemas import MAX_IMAGE_BYTES, ImageInput, ImageUploadRequest, ModerationRequest
 
 MAX_JSON_BYTES = 32 * 1024
 MAX_MULTIPART_BYTES = 9 * 1024 * 1024
@@ -100,8 +100,8 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
             408: "Request body deadline exceeded",
             413: "Request or image file exceeds its size limit",
             415: "Unsupported request content type or content encoding",
-            422: "Image data could not be decoded",
-            503: "Image validation is busy or exceeded its deadline",
+            422: "Image data is invalid or the source rejected retrieval",
+            503: "Image processing is busy or the source is temporarily unavailable",
             501: "Moderation is not implemented",
         }.items()
     },
@@ -151,7 +151,14 @@ async def moderate(request: Request) -> NoReturn:
         raise validation_error(exc) from exc
     if request.app.state.policies:
         resolve_policy(request.app.state.policies, policy_name, input_type)
-    if media_type == "multipart/form-data":
+    is_url = media_type == "application/json" and isinstance(payload.input, ImageInput)
+    if is_url:
+        downloader = request.app.state.downloads
+        if downloader is None:
+            raise APIError(503, "service_not_ready", "The service is not ready.", retryable=True)
+        assert isinstance(payload.input, ImageInput)
+        image_data = await downloader.fetch(payload.input.source.url)
+    if media_type == "multipart/form-data" or is_url:
         validator = request.app.state.images
         if validator is None:
             raise APIError(
@@ -161,7 +168,12 @@ async def moderate(request: Request) -> NoReturn:
                 retryable=True,
                 headers={"Retry-After": "1"},
             )
-        await validator.validate(image_data)
+        try:
+            await validator.validate(image_data)
+        except APIError as exc:
+            if is_url and exc.param == "file":
+                exc.param = "input.source.url"
+            raise
     raise APIError(501, "moderation_not_implemented", "Moderation is not implemented.")
 
 

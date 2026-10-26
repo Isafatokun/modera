@@ -25,13 +25,6 @@ def client(auth_headers: dict[str, str]) -> Iterator[TestClient]:
     "payload",
     [
         {"input": {"type": "text", "text": "hello"}},
-        {
-            "input": {
-                "type": "image",
-                "source": {"type": "url", "url": "https://media.example.com/photo.jpg"},
-            },
-            "policy": "community",
-        },
     ],
 )
 def test_valid_json_has_no_moderation_verdict(client: TestClient, payload: object) -> None:

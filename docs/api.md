@@ -3,7 +3,7 @@
 `POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
 Currently validates credentials, requests, and configured policy selections. Valid
-requests return `501 moderation_not_implemented`; no content is classified or fetched.
+requests return `501 moderation_not_implemented`; no content is classified.
 
 ## Requests
 
@@ -29,8 +29,11 @@ curl http://127.0.0.1:8000/v1/moderations \
 
 One input per request. `policy` defaults to `default`. Unknown/conflicting fields,
 duplicate form fields, base64, audio, video, and batches are rejected. Image URLs
-require HTTPS and cannot contain credentials or fragments; they are not fetched yet.
-Uploads must decode as still JPEG, PNG, or WebP. Filename and MIME type are not trusted.
+require HTTPS on port 443 and cannot contain credentials or fragments. Configure exact
+hosts, for example `MODERA_IMAGE_ALLOWED_HOSTS='["media.example.com"]'`; downloads
+are disabled by default. Private/internal DNS answers, redirects, environment proxies,
+and response compression are rejected. TLS certificates and hostnames are verified.
+Uploaded and downloaded images must decode as still JPEG, PNG, or WebP. Filename and MIME type are not trusted.
 Files are closed after reading; image data is not retained as a stored asset.
 
 | Limit | Value |
@@ -41,6 +44,8 @@ Files are closed after reading; image data is not retained as a stored asset.
 | Decoded image | 16 million pixels |
 | Request body | 32 KiB JSON; 9 MiB multipart including headers/boundaries |
 | Deadlines | 15 seconds for the body; 5 seconds for image validation |
+| Downloads | 4 per instance, no waiting queue; 20-second total deadline |
+| Download recovery | At most 2 attempts; 8 seconds each, 3-second inactivity timeout |
 | Policy name | 1–64 ASCII letters, digits, underscores, or hyphens |
 
 Body limits apply without `Content-Length`. Compressed bodies are unsupported.
@@ -49,6 +54,12 @@ syntax is validated. See [policy configuration](policies.md).
 
 Image decoding runs off the event loop, one job per instance with no decode queue.
 Timed-out native work keeps its slot until completion; excess work returns retryable `503`.
+
+Interrupted or stalled downloads restart once from byte zero with jitter; partial bytes
+are discarded. Each attempt resolves and validates the destination again. Permanent
+failures are not retried. Longer source `Retry-After` delays are returned to the caller
+instead of waiting inside the request. This is request-scoped recovery; progress does not survive
+a service restart.
 
 ## Moderation result (schema only)
 
@@ -100,16 +111,16 @@ metadata records provenance, not guaranteed reproducibility.
 
 | Status | Codes / meaning |
 | --- | --- |
-| `400` | `invalid_request`, `invalid_json`, `invalid_multipart`, `unsupported_input_type`, `unknown_policy`, `policy_not_applicable` |
+| `400` | `invalid_request`, `invalid_json`, `invalid_multipart`, `unsupported_input_type`, `unknown_policy`, `policy_not_applicable`, `image_url_not_allowed` |
 | `401` | `authentication_required`; includes `WWW-Authenticate: Bearer` |
 | `404` / `405` | `not_found` / `method_not_allowed` |
 | `408` | `request_timeout`; retryable |
 | `413` | `payload_too_large`, `image_too_large` |
 | `415` | `unsupported_media_type`, `unsupported_content_encoding`, `unsupported_image_format`, `animated_image_not_supported` |
-| `422` | `invalid_image`; recognized image format with corrupt/undecodable data |
+| `422` | `invalid_image` (undecodable data), `input_fetch_rejected` (source rejection, redirect, invalid response, or TLS failure) |
 | `500` | `internal_error`; no decision |
 | `501` | `moderation_not_implemented`; not retryable |
-| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`; retryable, `Retry-After: 1` |
+| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`, `input_fetch_failed`; retryable, `Retry-After: 1` |
 
 Policy [coverage failures](policies.md) will reach clients when inference is connected.
 

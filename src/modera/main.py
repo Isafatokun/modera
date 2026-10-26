@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
 from modera.config import Settings
+from modera.downloads import ImageDownloader
 from modera.errors import (
     ErrorResponse,
     RequestContextMiddleware,
@@ -23,11 +24,14 @@ from modera.policies import load_policies
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.images = ImageValidator()
+    app.state.downloads = ImageDownloader(app.state.image_allowed_hosts)
     app.state.ready = True
     try:
         yield
     finally:
         app.state.ready = False
+        await app.state.downloads.close()
+        app.state.downloads = None
         app.state.images.close()
         app.state.images = None
 
@@ -50,6 +54,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.api_key = config.api_key
     app.state.policies = load_policies(config.policy_file)
     app.state.images = None
+    app.state.downloads = None
+    app.state.image_allowed_hosts = config.image_allowed_hosts
     app.include_router(health_router)
     app.include_router(moderation_router)
     register_contract_schemas(app)
