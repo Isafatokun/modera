@@ -2,7 +2,8 @@
 
 Manual HTTP measurements, separate from the correctness tests in `tests/`.
 Runs on Linux/macOS with the pinned example Horizon text and ViT photo classifiers,
-FP32 CPU inference, one server process, and two inference threads. It starts a
+FP32 CPU inference, one server process, and two threads per model operation. Text
+and photo inference each have one slot, sharing the host's CPU and memory. It starts a
 loopback server with an ephemeral key; it does not target an existing deployment.
 
 From the repository root:

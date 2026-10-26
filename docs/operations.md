@@ -33,6 +33,9 @@ using the chosen models, instance resources, media sizes, and representative tra
 excess requests receive `503 service_busy` with `Retry-After: 1` before their body
 is read. Image download, validation, and inference have additional bounded capacity;
 there is no waiting queue. Health checks and metric scrapes bypass these limits.
+Text and photo inference each have one slot and reuse their loaded model. A busy
+photo model does not occupy the text inference slot, or vice versa. This separates
+inference admission; HTTP admission, CPU, memory, and the interpreter remain shared.
 
 Caller retries should have a deadline, bounded attempts, and jitter. A caller
 timeout or cancellation releases its HTTP slot, but native work keeps its worker

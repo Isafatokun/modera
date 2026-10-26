@@ -26,13 +26,19 @@ Text defaults to sigmoid and 256 tokens; photos default to softmax. Override
 limit returns `422 input_too_long`; content is never silently truncated.
 
 Only models needed by the selected policy run on a request; rules-only policies
-do not depend on model inference. Weights load once at startup, on CPU, from the local cache only. Loading requires
-safetensors and disables remote model code. Models warm before readiness; missing
+do not depend on model inference. Weights load once at startup, on CPU, from the
+local cache only. Loading requires safetensors and disables remote model code.
+Models warm before readiness; missing
 weights, incompatible architecture and invalid label mappings normally fail startup.
 Telemetry is disabled before importing inference libraries. Inference uses one slot
-per process, with no waiting queue; threads default to 2 and the deadline to 5 seconds
+per modality per process, with no waiting queue. Text and photos can run concurrently,
+using their existing model instances. Threads default to 2 per model operation;
+the deadline defaults to 5 seconds
 (`MODERA_INFERENCE_THREADS`, `MODERA_INFERENCE_TIMEOUT_SECONDS`). Timed-out native
-work retains its slot until completion. Busy/failed inference returns retryable `503`.
+work retains its modality's slot until completion. Busy/failed inference returns
+retryable `503`. Both model operations share the process's CPU and memory; concurrent
+inference can use twice the configured intra-operation threads. Set CPU/memory limits
+at deployment and measure mixed traffic before increasing threads or replicas.
 
 For containers, build with `--build-arg INFERENCE=true`, mount a prepared Hugging Face
 cache read-only, and set each model's `__CACHE_DIR` to the mounted cache root. Policy

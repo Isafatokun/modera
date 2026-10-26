@@ -60,7 +60,10 @@ class ModerationEngine:
             self._versions[kind] = f"{kind}-v1.{digest}"
         self._text: Classifier | None = None
         self._image: Classifier | None = None
-        self._worker = InferenceWorker(settings.inference_timeout_seconds)
+        self._workers = {
+            kind: InferenceWorker(settings.inference_timeout_seconds)
+            for kind in ("text", "image")
+        }
 
     def enabled(self, input_type: InputType) -> bool:
         return bool(
@@ -159,7 +162,7 @@ class ModerationEngine:
                         retryable=True,
                         headers={"Retry-After": "1"},
                     )
-                model_findings = await self._worker.run(
+                model_findings = await self._workers[input_type].run(
                     partial(adapter.predict, content)
                 )
                 findings.extend(model_findings)
@@ -200,6 +203,7 @@ class ModerationEngine:
         )
 
     def close(self) -> None:
-        self._worker.close()
+        for worker in self._workers.values():
+            worker.close()
         self._text = None
         self._image = None

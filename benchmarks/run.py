@@ -118,6 +118,7 @@ async def experiment(args: argparse.Namespace) -> None:
         "status": "running",
         "server_workers": 1,
         "inference_threads": 2,
+        "inference_slots": {"text": 1, "image": 1},
         "http_capacity": 8,
         "fixtures": {
             n: {"bytes": (output / f"{n}.jpg").stat().st_size}
