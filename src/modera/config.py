@@ -4,14 +4,22 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from modera.model_config import ImageModelSettings, TextModelSettings
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="MODERA_", frozen=True, extra="forbid", hide_input_in_errors=True
+        env_prefix="MODERA_",
+        env_nested_delimiter="__",
+        frozen=True,
+        extra="forbid",
+        hide_input_in_errors=True,
     )
 
     api_key: SecretStr = Field(repr=False)
     docs_enabled: bool = False
+    text_model: TextModelSettings | None = None
+    image_model: ImageModelSettings | None = None
     policy_file: Path | None = None
     image_allowed_hosts: tuple[str, ...] = ()
 

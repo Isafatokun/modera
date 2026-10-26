@@ -25,6 +25,8 @@ The server binds to localhost. Use `--reload` only for development.
 | `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
 | `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
+| `MODERA_TEXT_MODEL__ID` / `__REVISION` | Unset | Text model ID and full commit SHA |
+| `MODERA_IMAGE_MODEL__ID` / `__REVISION` | Unset | Photo model ID and full commit SHA |
 | `MODERA_IMAGE_ALLOWED_HOSTS` | `[]` | JSON array of exact DNS hostnames allowed for image downloads |
 
 Set variables through the shell or your deployment's secret manager. `.env` files
@@ -32,6 +34,17 @@ are not loaded automatically. Missing/invalid keys and invalid policy files prev
 startup. Generate a random key for each deployment; never commit it or embed it in
 browser/mobile code. Use HTTPS at the deployment ingress. Rotation requires replacing
 the secret and restarting instances and callers that use it.
+
+Model selections default to unset. Set `__ID` to a model repository and
+`__REVISION` to its full 40-character commit SHA; see [.env.example](.env.example).
+`MODERA_TEXT_MODEL__BACKEND` defaults to `transformers_sequence_classification`;
+`MODERA_IMAGE_MODEL__BACKEND` defaults to `transformers_image_classification`.
+Repository IDs are configurable, rather than restricted to particular vendors.
+Incomplete selections, mutable revisions such as `main`, and unknown backends fail
+validation. Changes require a restart. Different architectures need an adapter;
+compatible model replacements will still need output/category and policy validation.
+Inference adapters are pending: configuration currently loads no weights and
+requests continue to return `501` after validation.
 
 ## API
 

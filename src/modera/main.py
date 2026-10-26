@@ -54,6 +54,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.state.ready = False
     app.state.api_key = config.api_key
+    app.state.text_model = config.text_model
+    app.state.image_model = config.image_model
     app.state.policies = load_policies(config.policy_file)
     app.state.images = None
     app.state.downloads = None
