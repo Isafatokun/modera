@@ -12,6 +12,7 @@ dependencies = [
     "aiohttp>=3.14.5,<4",
     "fastapi>=0.141.1,<0.142",
     "pillow>=13.0.0,<14",
+    "prometheus-client>=0.24,<0.25",
     "pydantic-settings>=2.0,<3",
     "python-multipart>=0.0.32,<0.1",
     "uvicorn>=0.30,<1",

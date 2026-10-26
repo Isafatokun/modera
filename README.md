@@ -52,6 +52,10 @@ Health checks need no credentials: `/health/live` checks HTTP availability;
 `/health/ready` checks readiness for the configured model/rules mode. Successful checks return
 `{"status":"ok"}`. Every application HTTP response includes `X-Request-ID`.
 
+`GET /metrics` exposes Prometheus request counts, latency, and active requests; it
+requires the same bearer key. See [operations](docs/operations.md) for deployment
+and overload behavior.
+
 ## Container
 
 ```sh
@@ -79,5 +83,5 @@ Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Roadmap
 
-Operational metrics, additional inference adapters, a client SDK with bounded retries,
+Additional inference adapters, a client SDK with bounded retries,
 and durable asynchronous moderation jobs.
