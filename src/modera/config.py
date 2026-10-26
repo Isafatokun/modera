@@ -24,7 +24,9 @@ class Settings(BaseSettings):
                 r"[a-zA-Z](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?",
                 host,
             ):
-                raise ValueError("image hosts must be DNS names without wildcards, ports, or paths")
+                raise ValueError(
+                    "image hosts must be DNS names without wildcards, ports, or paths"
+                )
         return tuple(dict.fromkeys(host.lower() for host in hosts))
 
     @field_validator("api_key")

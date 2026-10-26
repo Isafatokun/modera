@@ -15,7 +15,8 @@ def test_filename_and_mime_are_not_trusted(
 ) -> None:
     with TestClient(create_app(), headers=auth_headers) as client:
         response = client.post(
-            "/v1/moderations", files={"file": ("misleading.svg", image_bytes, "text/plain")}
+            "/v1/moderations",
+            files={"file": ("misleading.svg", image_bytes, "text/plain")},
         )
     assert response.status_code == 501
 
@@ -23,10 +24,19 @@ def test_filename_and_mime_are_not_trusted(
 def test_invalid_image_returns_sanitized_error(
     auth_headers: dict[str, str], caplog: pytest.LogCaptureFixture
 ) -> None:
-    with caplog.at_level(logging.DEBUG), TestClient(create_app(), headers=auth_headers) as client:
+    with (
+        caplog.at_level(logging.DEBUG),
+        TestClient(create_app(), headers=auth_headers) as client,
+    ):
         response = client.post(
             "/v1/moderations",
-            files={"file": ("secret-filename.jpg", b"\xff\xd8\xffsecret-content", "image/jpeg")},
+            files={
+                "file": (
+                    "secret-filename.jpg",
+                    b"\xff\xd8\xffsecret-content",
+                    "image/jpeg",
+                )
+            },
         )
     assert response.status_code == 422
     error = response.json()["error"]
@@ -54,11 +64,15 @@ def test_overload_does_not_block_health_or_queue_decodes(
         async with (
             app.router.lifespan_context(app),
             AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://testserver", headers=auth_headers
+                transport=ASGITransport(app=app),
+                base_url="http://testserver",
+                headers=auth_headers,
             ) as client,
         ):
             first = asyncio.create_task(
-                client.post("/v1/moderations", files={"file": ("photo.png", image_bytes)})
+                client.post(
+                    "/v1/moderations", files={"file": ("photo.png", image_bytes)}
+                )
             )
             try:
                 assert await asyncio.to_thread(started.wait, 2)
@@ -73,15 +87,21 @@ def test_overload_does_not_block_health_or_queue_decodes(
                 finish.set()
             assert (await first).status_code == 501
             assert (
-                await client.post("/v1/moderations", files={"file": ("photo.png", image_bytes)})
+                await client.post(
+                    "/v1/moderations", files={"file": ("photo.png", image_bytes)}
+                )
             ).status_code == 501
 
     asyncio.run(scenario())
 
 
-def test_lifespan_restarts_resources(auth_headers: dict[str, str], image_bytes: bytes) -> None:
+def test_lifespan_restarts_resources(
+    auth_headers: dict[str, str], image_bytes: bytes
+) -> None:
     app = create_app()
     for _ in range(2):
         with TestClient(app, headers=auth_headers) as client:
-            response = client.post("/v1/moderations", files={"file": ("photo.png", image_bytes)})
+            response = client.post(
+                "/v1/moderations", files={"file": ("photo.png", image_bytes)}
+            )
             assert response.status_code == 501

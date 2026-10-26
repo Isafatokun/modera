@@ -42,7 +42,8 @@ def test_url_bytes_pass_through_image_validator(
     method = AsyncMock(return_value=image_bytes if content is None else content)
     monkeypatch.setattr(ImageDownloader, "_download", method)
     with TestClient(
-        create_app(Settings(image_allowed_hosts=("media.example.com",))), headers=auth_headers
+        create_app(Settings(image_allowed_hosts=("media.example.com",))),
+        headers=auth_headers,
     ) as client:
         response = client.post("/v1/moderations", json=PAYLOAD)
     assert response.status_code == status
@@ -56,11 +57,14 @@ def test_failed_source_returns_retryable_error_without_decision(
     monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
     method = AsyncMock(
-        side_effect=source_error(503, "input_fetch_failed", "Unavailable", retryable=True)
+        side_effect=source_error(
+            503, "input_fetch_failed", "Unavailable", retryable=True
+        )
     )
     monkeypatch.setattr(ImageDownloader, "_download", method)
     with TestClient(
-        create_app(Settings(image_allowed_hosts=("media.example.com",))), headers=auth_headers
+        create_app(Settings(image_allowed_hosts=("media.example.com",))),
+        headers=auth_headers,
     ) as client:
         response = client.post("/v1/moderations", json=PAYLOAD)
         assert client.get("/health/ready").status_code == 200

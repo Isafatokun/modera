@@ -6,7 +6,13 @@ import pytest
 from pydantic import ValidationError
 
 from modera.errors import APIError
-from modera.policies import Policy, PolicyConfig, PolicyRule, evaluate_policy, load_policies
+from modera.policies import (
+    Policy,
+    PolicyConfig,
+    PolicyRule,
+    evaluate_policy,
+    load_policies,
+)
 from modera.results import Coverage, Finding
 
 
@@ -18,11 +24,23 @@ def policy() -> Policy:
                 "id": "default",
                 "version": "1",
                 "text": [
-                    {"category": "violence", "review_threshold": 0.5, "block_threshold": 0.85}
+                    {
+                        "category": "violence",
+                        "review_threshold": 0.5,
+                        "block_threshold": 0.85,
+                    }
                 ],
                 "image": [
-                    {"category": "sexual", "review_threshold": 0.5, "block_threshold": 0.85},
-                    {"category": "violence", "review_threshold": 0.5, "block_threshold": 0.85},
+                    {
+                        "category": "sexual",
+                        "review_threshold": 0.5,
+                        "block_threshold": 0.85,
+                    },
+                    {
+                        "category": "violence",
+                        "review_threshold": 0.5,
+                        "block_threshold": 0.85,
+                    },
                 ],
             }
         )
@@ -55,7 +73,10 @@ def test_block_precedes_review(policy: Policy) -> None:
     decision = evaluate_policy(
         policy,
         "image",
-        [Finding(category="sexual", score=0.6), Finding(category="violence", score=0.9)],
+        [
+            Finding(category="sexual", score=0.6),
+            Finding(category="violence", score=0.9),
+        ],
         Coverage(evaluated=["sexual", "violence"], unsupported=[], not_applicable=[]),
     )
     assert decision.action == "block"
@@ -77,11 +98,15 @@ def test_single_threshold_rules(threshold: str, action: str) -> None:
     )
     coverage = Coverage(evaluated=["violence"], unsupported=[], not_applicable=[])
     assert (
-        evaluate_policy(policy, "text", [Finding(category="violence", score=0.8)], coverage).action
+        evaluate_policy(
+            policy, "text", [Finding(category="violence", score=0.8)], coverage
+        ).action
         == action
     )
     assert (
-        evaluate_policy(policy, "text", [Finding(category="violence", score=0.79)], coverage).action
+        evaluate_policy(
+            policy, "text", [Finding(category="violence", score=0.79)], coverage
+        ).action
         == "allow"
     )
 
@@ -95,7 +120,10 @@ def test_reason_order_follows_policy_order(policy: Policy) -> None:
     decision = evaluate_policy(
         policy,
         "image",
-        [Finding(category="violence", score=0.95), Finding(category="sexual", score=0.9)],
+        [
+            Finding(category="violence", score=0.95),
+            Finding(category="sexual", score=0.9),
+        ],
         Coverage(evaluated=["violence", "sexual"], unsupported=[], not_applicable=[]),
     )
     assert decision.reasons == ["sexual", "violence"]
@@ -103,16 +131,22 @@ def test_reason_order_follows_policy_order(policy: Policy) -> None:
 
 @pytest.mark.parametrize("missing", ["unsupported", "not_applicable", "unavailable"])
 @pytest.mark.parametrize("score", [0.1, 1.0])
-def test_missing_required_checks_never_allow(policy: Policy, missing: str, score: float) -> None:
+def test_missing_required_checks_never_allow(
+    policy: Policy, missing: str, score: float
+) -> None:
     coverage = Coverage(
         evaluated=["violence"],
         unsupported=["sexual"] if missing == "unsupported" else [],
         not_applicable=["sexual"] if missing == "not_applicable" else [],
     )
     with pytest.raises(APIError) as failure:
-        evaluate_policy(policy, "image", [Finding(category="violence", score=score)], coverage)
+        evaluate_policy(
+            policy, "image", [Finding(category="violence", score=score)], coverage
+        )
     error = failure.value
-    assert error.code == ("check_unavailable" if missing == "unavailable" else "policy_unsupported")
+    assert error.code == (
+        "check_unavailable" if missing == "unavailable" else "policy_unsupported"
+    )
     assert error.retryable is (missing == "unavailable")
     assert error.status_code == (503 if missing == "unavailable" else 400)
 
@@ -160,8 +194,12 @@ def test_unrelated_findings_cannot_produce_allow() -> None:
     assert failure.value.code == "policy_not_applicable"
 
 
-@pytest.mark.parametrize("findings", [[], [Finding(category="violence", score=0.1)] * 2])
-def test_inconsistent_findings_are_rejected(policy: Policy, findings: list[Finding]) -> None:
+@pytest.mark.parametrize(
+    "findings", [[], [Finding(category="violence", score=0.1)] * 2]
+)
+def test_inconsistent_findings_are_rejected(
+    policy: Policy, findings: list[Finding]
+) -> None:
     with pytest.raises(ValueError, match="findings must match"):
         evaluate_policy(
             policy,

@@ -45,7 +45,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if config.docs_enabled else None,
         redoc_url=None,
         openapi_url="/openapi.json" if config.docs_enabled else None,
-        responses={500: {"model": ErrorResponse, "description": "Unexpected server error"}},
+        responses={
+            500: {"model": ErrorResponse, "description": "Unexpected server error"}
+        },
     )
     app.add_middleware(RequestContextMiddleware)
     app.add_exception_handler(HTTPException, http_error_handler)

@@ -31,14 +31,21 @@ def payload() -> dict[str, Any]:
 
 @pytest.mark.parametrize("input_type", ["text", "image"])
 @pytest.mark.parametrize("action", ["allow", "review", "block"])
-def test_result_round_trip(payload: dict[str, Any], input_type: str, action: str) -> None:
+def test_result_round_trip(
+    payload: dict[str, Any], input_type: str, action: str
+) -> None:
     payload["input_type"] = input_type
-    payload["decision"] = {"action": action, "reasons": [] if action == "allow" else ["violence"]}
+    payload["decision"] = {
+        "action": action,
+        "reasons": [] if action == "allow" else ["violence"],
+    }
     result = ModerationResult.model_validate(payload)
     assert ModerationResult.model_validate_json(result.model_dump_json()) == result
 
 
-@pytest.mark.parametrize("score", [-0.01, 1.01, float("nan"), float("inf"), "0.5", True])
+@pytest.mark.parametrize(
+    "score", [-0.01, 1.01, float("nan"), float("inf"), "0.5", True]
+)
 def test_invalid_scores_are_rejected(payload: dict[str, Any], score: object) -> None:
     payload["findings"][0]["score"] = score
     with pytest.raises(ValidationError):
@@ -61,7 +68,9 @@ def test_score_boundaries(payload: dict[str, Any], score: float) -> None:
         {"action": "pending", "reasons": []},
     ],
 )
-def test_inconsistent_decisions_are_rejected(payload: dict[str, Any], decision: object) -> None:
+def test_inconsistent_decisions_are_rejected(
+    payload: dict[str, Any], decision: object
+) -> None:
     payload["decision"] = decision
     with pytest.raises(ValidationError):
         ModerationResult.model_validate(payload)
@@ -75,7 +84,9 @@ def test_conflicting_coverage_is_rejected(payload: dict[str, Any], field: str) -
 
 
 @pytest.mark.parametrize("category", ["sexual", "hate"])
-def test_findings_must_match_evaluated_checks(payload: dict[str, Any], category: str) -> None:
+def test_findings_must_match_evaluated_checks(
+    payload: dict[str, Any], category: str
+) -> None:
     payload["findings"].append({"category": category, "score": 0.0})
     with pytest.raises(ValidationError):
         ModerationResult.model_validate(payload)
@@ -95,7 +106,9 @@ def test_empty_evaluation_cannot_produce_allow(payload: dict[str, Any]) -> None:
         ModerationResult.model_validate(payload)
 
 
-@pytest.mark.parametrize("field", ["request_id", "policy", "models", "preprocessing_version"])
+@pytest.mark.parametrize(
+    "field", ["request_id", "policy", "models", "preprocessing_version"]
+)
 def test_provenance_is_required(payload: dict[str, Any], field: str) -> None:
     payload.pop(field)
     with pytest.raises(ValidationError):
@@ -103,7 +116,9 @@ def test_provenance_is_required(payload: dict[str, Any], field: str) -> None:
 
 
 @pytest.mark.parametrize("version", ["", " ", "revision with spaces", 1])
-def test_policy_version_is_a_nonempty_string(payload: dict[str, Any], version: object) -> None:
+def test_policy_version_is_a_nonempty_string(
+    payload: dict[str, Any], version: object
+) -> None:
     payload["policy"]["version"] = version
     with pytest.raises(ValidationError):
         ModerationResult.model_validate(payload)

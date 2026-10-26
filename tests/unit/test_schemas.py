@@ -5,7 +5,9 @@ from modera.schemas import MAX_TEXT_CHARACTERS, ModerationRequest
 
 
 def test_text_preserves_original_content() -> None:
-    request = ModerationRequest.model_validate({"input": {"type": "text", "text": " hello "}})
+    request = ModerationRequest.model_validate(
+        {"input": {"type": "text", "text": " hello "}}
+    )
     assert request.input.type == "text"
     assert request.input.text == " hello "
     assert request.policy == "default"
@@ -64,7 +66,10 @@ def test_image_url_and_named_policy() -> None:
         {
             "input": {
                 "type": "image",
-                "source": {"type": "url", "url": "https://media.example.com/photo.jpg?token=abc"},
+                "source": {
+                    "type": "url",
+                    "url": "https://media.example.com/photo.jpg?token=abc",
+                },
             },
             "policy": "community_v1",
         }

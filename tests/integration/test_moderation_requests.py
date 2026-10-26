@@ -17,7 +17,9 @@ from modera.schemas import MAX_IMAGE_BYTES
 
 @pytest.fixture
 def client(auth_headers: dict[str, str]) -> Iterator[TestClient]:
-    with TestClient(create_app(Settings(docs_enabled=True)), headers=auth_headers) as value:
+    with TestClient(
+        create_app(Settings(docs_enabled=True)), headers=auth_headers
+    ) as value:
         yield value
 
 
@@ -27,7 +29,9 @@ def client(auth_headers: dict[str, str]) -> Iterator[TestClient]:
         {"input": {"type": "text", "text": "hello"}},
     ],
 )
-def test_valid_json_has_no_moderation_verdict(client: TestClient, payload: object) -> None:
+def test_valid_json_has_no_moderation_verdict(
+    client: TestClient, payload: object
+) -> None:
     response = client.post("/v1/moderations", json=payload)
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "moderation_not_implemented"
@@ -38,7 +42,9 @@ def test_valid_json_has_no_moderation_verdict(client: TestClient, payload: objec
 def test_invalid_json_fields_are_sanitized(client: TestClient) -> None:
     response = client.post(
         "/v1/moderations",
-        json={"input": {"type": "text", "text": "sensitive content", "extra": "secret"}},
+        json={
+            "input": {"type": "text", "text": "sensitive content", "extra": "secret"}
+        },
     )
     assert response.status_code == 400
     assert "sensitive content" not in response.text
@@ -56,7 +62,9 @@ def test_malformed_json_is_rejected(client: TestClient, body: bytes) -> None:
 
 
 @pytest.mark.parametrize("policy", [None, "community"])
-def test_file_upload_contract(client: TestClient, policy: str | None, image_bytes: bytes) -> None:
+def test_file_upload_contract(
+    client: TestClient, policy: str | None, image_bytes: bytes
+) -> None:
     response = client.post(
         "/v1/moderations",
         files={"file": ("photo.jpg", image_bytes, "image/jpeg")},
@@ -88,7 +96,9 @@ def test_upload_is_closed_after_validation(
 
 @pytest.mark.parametrize("field", ["file", "unexpected"])
 def test_empty_or_unknown_upload_is_rejected(client: TestClient, field: str) -> None:
-    response = client.post("/v1/moderations", files={field: ("photo.jpg", b"", "image/jpeg")})
+    response = client.post(
+        "/v1/moderations", files={field: ("photo.jpg", b"", "image/jpeg")}
+    )
     assert response.status_code == 400
 
 
@@ -109,20 +119,27 @@ def test_unknown_form_field_is_rejected(client: TestClient) -> None:
 
 def test_missing_multipart_boundary_is_rejected(client: TestClient) -> None:
     response = client.post(
-        "/v1/moderations", content=b"invalid", headers={"content-type": "multipart/form-data"}
+        "/v1/moderations",
+        content=b"invalid",
+        headers={"content-type": "multipart/form-data"},
     )
     assert response.status_code == 400
 
 
 @pytest.mark.parametrize("ending", [b"", b"--b", b"--b\r\n"])
-def test_truncated_policy_does_not_silently_use_default(client: TestClient, ending: bytes) -> None:
+def test_truncated_policy_does_not_silently_use_default(
+    client: TestClient, ending: bytes
+) -> None:
     body = (
         b'--b\r\nContent-Disposition: form-data; name="file"; filename="a.jpg"\r\n'
         b"Content-Type: image/jpeg\r\n\r\nimage bytes\r\n"
-        b'--b\r\nContent-Disposition: form-data; name="policy"\r\n\r\ncommunity\r\n' + ending
+        b'--b\r\nContent-Disposition: form-data; name="policy"\r\n\r\ncommunity\r\n'
+        + ending
     )
     response = client.post(
-        "/v1/moderations", content=body, headers={"content-type": "multipart/form-data; boundary=b"}
+        "/v1/moderations",
+        content=body,
+        headers={"content-type": "multipart/form-data; boundary=b"},
     )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_multipart"
@@ -145,7 +162,9 @@ def test_truncated_upload_is_closed(
         b"\r\nimage bytes" + ending
     )
     response = client.post(
-        "/v1/moderations", content=body, headers={"content-type": "multipart/form-data; boundary=b"}
+        "/v1/moderations",
+        content=body,
+        headers={"content-type": "multipart/form-data; boundary=b"},
     )
     assert response.status_code == 400
     assert len(files) == 1
@@ -154,7 +173,9 @@ def test_truncated_upload_is_closed(
 
 def test_duplicate_file_and_text_field_is_rejected(client: TestClient) -> None:
     response = client.post(
-        "/v1/moderations", files={"file": ("a.jpg", b"a")}, data={"file": "conflicting field"}
+        "/v1/moderations",
+        files={"file": ("a.jpg", b"a")},
+        data={"file": "conflicting field"},
     )
     assert response.status_code == 400
 
@@ -176,15 +197,21 @@ def test_body_deadline_is_enforced(
             headers=auth_headers,
         ) as client:
             response = await client.post(
-                "/v1/moderations", content=body(), headers={"content-type": "application/json"}
+                "/v1/moderations",
+                content=body(),
+                headers={"content-type": "application/json"},
             )
             assert response.status_code == 408
 
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("size,status", [(MAX_IMAGE_BYTES, 501), (MAX_IMAGE_BYTES + 1, 413)])
-def test_file_size_boundary(client: TestClient, size: int, status: int, image_bytes: bytes) -> None:
+@pytest.mark.parametrize(
+    "size,status", [(MAX_IMAGE_BYTES, 501), (MAX_IMAGE_BYTES + 1, 413)]
+)
+def test_file_size_boundary(
+    client: TestClient, size: int, status: int, image_bytes: bytes
+) -> None:
     data = image_bytes + b"\0" * (size - len(image_bytes))
     response = client.post("/v1/moderations", files={"file": ("a.jpg", data)})
     assert response.status_code == status
@@ -196,12 +223,16 @@ def test_streaming_body_limit_without_content_length(client: TestClient) -> None
             yield b"x" * 1024
 
     response = client.post(
-        "/v1/moderations", content=chunks(), headers={"content-type": "application/json"}
+        "/v1/moderations",
+        content=chunks(),
+        headers={"content-type": "application/json"},
     )
     assert response.status_code == 413
 
 
-@pytest.mark.parametrize("content_type", ["text/plain", "application/x-www-form-urlencoded", ""])
+@pytest.mark.parametrize(
+    "content_type", ["text/plain", "application/x-www-form-urlencoded", ""]
+)
 def test_unsupported_content_types(client: TestClient, content_type: str) -> None:
     response = client.post(
         "/v1/moderations", content=b"hello", headers={"content-type": content_type}
@@ -218,7 +249,9 @@ def test_encoded_request_is_rejected(client: TestClient) -> None:
     assert response.status_code == 415
 
 
-def test_openapi_describes_both_encodings_and_resolves_references(client: TestClient) -> None:
+def test_openapi_describes_both_encodings_and_resolves_references(
+    client: TestClient,
+) -> None:
     schema = client.get("/openapi.json").json()
     operation = schema["paths"]["/v1/moderations"]["post"]
     assert set(operation["requestBody"]["content"]) == {
@@ -230,9 +263,15 @@ def test_openapi_describes_both_encodings_and_resolves_references(client: TestCl
     assert "422" in operation["responses"]
     models = schema["components"]["schemas"]
     assert "ModerationResult" in models
-    assert models["Decision"]["properties"]["action"]["enum"] == ["allow", "review", "block"]
+    assert models["Decision"]["properties"]["action"]["enum"] == [
+        "allow",
+        "review",
+        "block",
+    ]
     assert (
-        models["ModerationRequest"]["properties"]["input"]["discriminator"]["propertyName"]
+        models["ModerationRequest"]["properties"]["input"]["discriminator"][
+            "propertyName"
+        ]
         == "type"
     )
     assert models["ImageUploadRequest"]["properties"]["file"]["format"] == "binary"

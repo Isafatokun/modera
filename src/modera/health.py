@@ -18,7 +18,8 @@ async def liveness() -> HealthResponse:
 
 
 @router.get(
-    "/ready", responses={503: {"model": ErrorResponse, "description": "Service is not ready"}}
+    "/ready",
+    responses={503: {"model": ErrorResponse, "description": "Service is not ready"}},
 )
 async def readiness(request: Request) -> HealthResponse:
     if not request.app.state.ready:

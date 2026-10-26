@@ -102,12 +102,16 @@ def test_destination_rejected_before_network(url: str) -> None:
     asyncio.run(scenario())
 
 
-def test_retry_restarts_download_and_releases_capacity(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_restarts_download_and_releases_capacity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def scenario() -> None:
         worker = ImageDownloader(("media.example.com",))
         method = AsyncMock(
             side_effect=[
-                downloads.source_error(503, "input_fetch_failed", "Unavailable", retryable=True),
+                downloads.source_error(
+                    503, "input_fetch_failed", "Unavailable", retryable=True
+                ),
                 b"complete",
             ]
         )
@@ -177,7 +181,9 @@ async def with_source(
 )
 def test_source_statuses(status: int, code: str, retryable: bool) -> None:
     async def handler(request: web.Request) -> web.Response:
-        return web.Response(status=status, headers={"Location": "http://127.0.0.1/private"})
+        return web.Response(
+            status=status, headers={"Location": "http://127.0.0.1/private"}
+        )
 
     async def check(url: str) -> None:
         with pytest.raises(APIError) as error:
@@ -194,7 +200,9 @@ def test_stream_size_limits(monkeypatch: pytest.MonkeyPatch, declared: bool) -> 
     monkeypatch.setattr(downloads, "MAX_IMAGE_BYTES", 3)
 
     async def handler(request: web.Request) -> web.StreamResponse:
-        response = web.StreamResponse(headers={"Content-Length": "4"} if declared else {})
+        response = web.StreamResponse(
+            headers={"Content-Length": "4"} if declared else {}
+        )
         await response.prepare(request)
         await response.write(b"abcd")
         return response
@@ -207,7 +215,9 @@ def test_stream_size_limits(monkeypatch: pytest.MonkeyPatch, declared: bool) -> 
     asyncio.run(with_source(handler, check))
 
 
-def test_interrupted_body_is_discarded_on_restart(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_interrupted_body_is_discarded_on_restart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = 0
 
     async def handler(request: web.Request) -> web.StreamResponse:
@@ -232,7 +242,10 @@ def test_interrupted_body_is_discarded_on_restart(monkeypatch: pytest.MonkeyPatc
             return await original(url)
 
         monkeypatch.setattr(worker, "_download", local)
-        assert await worker.fetch(HttpUrl("https://media.example.com/image")) == b"whole image"
+        assert (
+            await worker.fetch(HttpUrl("https://media.example.com/image"))
+            == b"whole image"
+        )
         assert calls == 2
 
     asyncio.run(with_source(handler, check))
@@ -334,7 +347,9 @@ def test_tls_hostname_and_single_resolution(
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     server_context.load_cert_chain(certificate, key)
     names: list[str | None] = []
-    server_context.set_servername_callback(lambda _socket, name, _context: names.append(name))
+    server_context.set_servername_callback(
+        lambda _socket, name, _context: names.append(name)
+    )
     client_context = ssl.create_default_context(cafile=str(certificate))
     connector_class = aiohttp.TCPConnector
 
@@ -372,7 +387,8 @@ def test_tls_hostname_and_single_resolution(
             monkeypatch.setattr(asyncio.get_running_loop(), "getaddrinfo", lookup)
             worker = ImageDownloader(())
             assert (
-                await worker._download(f"https://media.example.com:{port}/image") == b"image bytes"
+                await worker._download(f"https://media.example.com:{port}/image")
+                == b"image bytes"
             )
             assert lookup.await_count == 1
             assert checked == ["127.0.0.1"]

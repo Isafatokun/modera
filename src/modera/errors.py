@@ -55,7 +55,9 @@ def error_response(error: APIError, request_id: str) -> JSONResponse:
     )
     headers = dict(error.headers or {})
     headers["Cache-Control"] = "no-store"
-    return JSONResponse(body.model_dump(), status_code=error.status_code, headers=headers)
+    return JSONResponse(
+        body.model_dump(), status_code=error.status_code, headers=headers
+    )
 
 
 async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -66,10 +68,16 @@ async def http_error_handler(request: Request, exc: Exception) -> JSONResponse:
     else:
         code, message = {
             400: ("invalid_request", "The request is invalid."),
-            401: ("authentication_required", "Valid authentication credentials are required."),
+            401: (
+                "authentication_required",
+                "Valid authentication credentials are required.",
+            ),
             403: ("forbidden", "Access to this resource is forbidden."),
             404: ("not_found", "The requested resource was not found."),
-            405: ("method_not_allowed", "The HTTP method is not allowed for this resource."),
+            405: (
+                "method_not_allowed",
+                "The HTTP method is not allowed for this resource.",
+            ),
         }.get(exc.status_code, ("http_error", "The request could not be completed."))
         error = APIError(exc.status_code, code, message, headers=exc.headers)
     return error_response(error, request.state.request_id)
@@ -114,7 +122,10 @@ def validation_error(exc: ValidationError | RequestValidationError) -> APIError:
     message = messages.get(first["type"], "Request validation failed.")
     if first["type"] == "union_tag_invalid":
         return APIError(
-            400, "unsupported_input_type", "Supported input types are text and image.", param=param
+            400,
+            "unsupported_input_type",
+            "Supported input types are text and image.",
+            param=param,
         )
     if param == "input.source.url":
         message = "A valid HTTPS URL without credentials or fragments is required."
@@ -154,9 +165,12 @@ class RequestContextMiddleware:
             if started:
                 raise
             logger.error(
-                "Unhandled request error: request_id=%s type=%s", request_id, type(exc).__name__
+                "Unhandled request error: request_id=%s type=%s",
+                request_id,
+                type(exc).__name__,
             )
             response = error_response(
-                APIError(500, "internal_error", "An unexpected error occurred."), request_id
+                APIError(500, "internal_error", "An unexpected error occurred."),
+                request_id,
             )
             await response(scope, receive, send_with_id)

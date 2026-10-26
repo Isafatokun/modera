@@ -6,7 +6,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from modera.errors import APIError
 
-bearer = HTTPBearer(auto_error=False, scheme_name="ApiKey", description="Shared service API key")
+bearer = HTTPBearer(
+    auto_error=False, scheme_name="ApiKey", description="Shared service API key"
+)
 
 
 async def authenticate(

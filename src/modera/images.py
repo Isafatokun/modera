@@ -17,7 +17,9 @@ warnings.filterwarnings("error", category=Image.DecompressionBombWarning)
 
 def validate_image(data: bytes) -> None:
     if len(data) > MAX_IMAGE_BYTES:
-        raise APIError(413, "payload_too_large", "The image file is too large.", param="file")
+        raise APIError(
+            413, "payload_too_large", "The image file is too large.", param="file"
+        )
     recognized = (
         data.startswith(b"\xff\xd8\xff")
         or data.startswith(b"\x89PNG\r\n\x1a\n")
@@ -34,7 +36,10 @@ def validate_image(data: bytes) -> None:
         with Image.open(BytesIO(data), formats=FORMATS) as image:
             if image.width * image.height > MAX_IMAGE_PIXELS:
                 raise APIError(
-                    413, "image_too_large", "The image exceeds the pixel limit.", param="file"
+                    413,
+                    "image_too_large",
+                    "The image exceeds the pixel limit.",
+                    param="file",
                 )
             if getattr(image, "n_frames", 1) != 1:
                 raise APIError(
@@ -60,7 +65,9 @@ class ImageValidator:
     def __init__(self) -> None:
         if not all(features.check(codec) for codec in ("jpg", "zlib", "webp")):
             raise RuntimeError("required image codecs are unavailable")
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="modera-image")
+        self._executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="modera-image"
+        )
         self._lock = Lock()
         self._busy = False
         self._closed = False

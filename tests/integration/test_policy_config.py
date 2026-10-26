@@ -29,7 +29,9 @@ def test_configured_policy_selection_and_shared_errors(
 ) -> None:
     path = tmp_path / "policies.json"
     write_policy(path)
-    with TestClient(create_app(Settings(policy_file=path)), headers=auth_headers) as client:
+    with TestClient(
+        create_app(Settings(policy_file=path)), headers=auth_headers
+    ) as client:
         payload = {"input": {"type": "text", "text": "hello"}}
         assert client.post("/v1/moderations", json=payload).status_code == 501
         response = client.post("/v1/moderations", json={**payload, "policy": "unknown"})
@@ -37,7 +39,9 @@ def test_configured_policy_selection_and_shared_errors(
         assert response.json()["error"]["code"] == "unknown_policy"
         assert response.json()["error"]["param"] == "policy"
         assert response.json()["error"]["retryable"] is False
-        response = client.post("/v1/moderations", files={"file": ("photo.jpg", b"image bytes")})
+        response = client.post(
+            "/v1/moderations", files={"file": ("photo.jpg", b"image bytes")}
+        )
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "policy_not_applicable"
         response = client.post(

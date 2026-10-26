@@ -4,7 +4,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from modera.schemas import PolicyName
 
-Category = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_./-]*$")]
+Category = Annotated[
+    str, Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_./-]*$")
+]
 Version = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^\S+$")]
 Score = Annotated[float, Field(ge=0, le=1, allow_inf_nan=False)]
 

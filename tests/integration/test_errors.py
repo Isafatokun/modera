@@ -18,12 +18,23 @@ from modera.main import create_app
         ({"input": {"type": "audio-secret"}}, "unsupported_input_type", "input.type"),
         ({"input": {"text": "hello"}}, "invalid_request", "input.type"),
         (
-            {"input": {"type": "image", "source": {"type": "url", "url": "secret-value"}}},
+            {
+                "input": {
+                    "type": "image",
+                    "source": {"type": "url", "url": "secret-value"},
+                }
+            },
             "invalid_request",
             "input.source.url",
         ),
         (
-            {"input": {"type": "text", "text": "hello", "secret-field": "secret-value"}},
+            {
+                "input": {
+                    "type": "text",
+                    "text": "hello",
+                    "secret-field": "secret-value",
+                }
+            },
             "invalid_request",
             "input",
         ),
@@ -49,10 +60,14 @@ def test_validation_error_contract(
     assert "secret" not in response.text
 
 
-def test_malformed_json_has_no_field_or_submitted_content(auth_headers: dict[str, str]) -> None:
+def test_malformed_json_has_no_field_or_submitted_content(
+    auth_headers: dict[str, str],
+) -> None:
     with TestClient(create_app(), headers=auth_headers) as client:
         response = client.post(
-            "/v1/moderations", content=b'{"secret":', headers={"content-type": "application/json"}
+            "/v1/moderations",
+            content=b'{"secret":',
+            headers={"content-type": "application/json"},
         )
     assert response.status_code == 400
     error = response.json()["error"]
@@ -102,7 +117,10 @@ def test_unexpected_errors_are_sanitized_in_response_and_logs(
     async def broken() -> None:
         raise RuntimeError("sensitive-content token=secret-value")
 
-    with caplog.at_level(logging.ERROR, logger="modera.errors"), TestClient(app) as client:
+    with (
+        caplog.at_level(logging.ERROR, logger="modera.errors"),
+        TestClient(app) as client,
+    ):
         response = client.get("/broken")
         assert client.get("/health/live").status_code == 200
     assert response.status_code == 500

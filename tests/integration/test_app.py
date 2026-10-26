@@ -24,7 +24,9 @@ def test_health_tracks_lifecycle() -> None:
 
 
 @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
-def test_docs_are_disabled_by_default(path: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_docs_are_disabled_by_default(
+    path: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv("MODERA_DOCS_ENABLED", raising=False)
     with TestClient(create_app()) as client:
         assert client.get(path).status_code == 404

@@ -1,12 +1,23 @@
 from typing import Annotated, Literal
 
 from fastapi import UploadFile
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, UrlConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    UrlConstraints,
+    field_validator,
+)
 
 MAX_TEXT_CHARACTERS = 4096
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
-PolicyName = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")]
-ImageUrl = Annotated[HttpUrl, UrlConstraints(allowed_schemes=["https"], max_length=2048)]
+PolicyName = Annotated[
+    str, Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+]
+ImageUrl = Annotated[
+    HttpUrl, UrlConstraints(allowed_schemes=["https"], max_length=2048)
+]
 
 
 class RequestModel(BaseModel):

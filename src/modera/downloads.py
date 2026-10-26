@@ -20,7 +20,9 @@ MAX_DOWNLOADS = 4
 URL_PARAM = "input.source.url"
 
 
-def source_error(status: int, code: str, message: str, *, retryable: bool = False) -> APIError:
+def source_error(
+    status: int, code: str, message: str, *, retryable: bool = False
+) -> APIError:
     return APIError(
         status,
         code,
@@ -40,7 +42,11 @@ def require_public(address: str) -> None:
         or ip == ipaddress.ip_address("168.63.129.16")
         or (
             isinstance(ip, ipaddress.IPv6Address)
-            and (ip.ipv4_mapped is not None or ip.sixtofour is not None or ip.teredo is not None)
+            and (
+                ip.ipv4_mapped is not None
+                or ip.sixtofour is not None
+                or ip.teredo is not None
+            )
         )
     ):
         raise source_error(
@@ -68,13 +74,22 @@ class ImageDownloader:
         self._closed = True
 
     async def fetch(self, url: HttpUrl) -> bytes:
-        if url.scheme != "https" or url.host not in self._allowed_hosts or url.port != 443:
+        if (
+            url.scheme != "https"
+            or url.host not in self._allowed_hosts
+            or url.port != 443
+        ):
             raise source_error(
-                400, "image_url_not_allowed", "The image URL destination is not allowed."
+                400,
+                "image_url_not_allowed",
+                "The image URL destination is not allowed.",
             )
         if self._closed or self._active >= MAX_DOWNLOADS:
             raise source_error(
-                503, "service_busy", "Image downloading is temporarily unavailable.", retryable=True
+                503,
+                "service_busy",
+                "Image downloading is temporarily unavailable.",
+                retryable=True,
             )
         self._active += 1
         try:
@@ -146,15 +161,22 @@ class ImageDownloader:
                                 )
                                 + 1
                             )
-                            error.headers = {"Retry-After": str(max(1, min(delay, 86400)))}
+                            error.headers = {
+                                "Retry-After": str(max(1, min(delay, 86400)))
+                            }
                         except (ValueError, TypeError, OverflowError):
                             pass
                     raise error
                 if response.status != 200:
                     raise source_error(
-                        422, "input_fetch_rejected", "The image source did not return an image."
+                        422,
+                        "input_fetch_rejected",
+                        "The image source did not return an image.",
                     )
-                if response.headers.get("Content-Encoding", "identity").lower() != "identity":
+                if (
+                    response.headers.get("Content-Encoding", "identity").lower()
+                    != "identity"
+                ):
                     raise source_error(
                         415,
                         "unsupported_content_encoding",
@@ -164,18 +186,26 @@ class ImageDownloader:
                     response.content_length is not None
                     and response.content_length > MAX_IMAGE_BYTES
                 ):
-                    raise source_error(413, "payload_too_large", "The image file is too large.")
+                    raise source_error(
+                        413, "payload_too_large", "The image file is too large."
+                    )
                 data = bytearray()
                 async for chunk in response.content.iter_chunked(64 * 1024):
                     if len(data) + len(chunk) > MAX_IMAGE_BYTES:
-                        raise source_error(413, "payload_too_large", "The image file is too large.")
+                        raise source_error(
+                            413, "payload_too_large", "The image file is too large."
+                        )
                     data.extend(chunk)
                 return bytes(data)
         except (aiohttp.ClientSSLError, aiohttp.InvalidURL) as exc:
             raise source_error(
                 422, "input_fetch_rejected", "The image source could not be verified."
             ) from exc
-        except (aiohttp.ClientConnectionError, aiohttp.ClientPayloadError, TimeoutError) as exc:
+        except (
+            aiohttp.ClientConnectionError,
+            aiohttp.ClientPayloadError,
+            TimeoutError,
+        ) as exc:
             raise source_error(
                 503,
                 "input_fetch_failed",
@@ -184,7 +214,9 @@ class ImageDownloader:
             ) from exc
         except aiohttp.ClientError as exc:
             raise source_error(
-                422, "input_fetch_rejected", "The image source returned an invalid response."
+                422,
+                "input_fetch_rejected",
+                "The image source returned an invalid response.",
             ) from exc
         finally:
             await resolver.close()

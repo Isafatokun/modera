@@ -17,7 +17,11 @@ def encoded_image(format: str, animated: bool = False) -> bytes:
         if animated:
             with Image.new("RGB", (8, 8), "blue") as second:
                 first.save(
-                    buffer, format=format, save_all=True, append_images=[second], duration=100
+                    buffer,
+                    format=format,
+                    save_all=True,
+                    append_images=[second],
+                    duration=100,
                 )
         else:
             first.save(buffer, format=format)
@@ -76,7 +80,9 @@ def test_pixel_limit_is_checked_before_decoding(
     assert failure.value.code == "image_too_large"
 
 
-def test_pixel_limit_is_inclusive(monkeypatch: pytest.MonkeyPatch, image_bytes: bytes) -> None:
+def test_pixel_limit_is_inclusive(
+    monkeypatch: pytest.MonkeyPatch, image_bytes: bytes
+) -> None:
     monkeypatch.setattr(images, "MAX_IMAGE_PIXELS", 4)
     validate_image(image_bytes)
 
@@ -108,7 +114,9 @@ def test_errors_release_capacity(image_bytes: bytes) -> None:
 
 
 @pytest.mark.parametrize("cancel", [False, True])
-def test_late_native_work_keeps_capacity(monkeypatch: pytest.MonkeyPatch, cancel: bool) -> None:
+def test_late_native_work_keeps_capacity(
+    monkeypatch: pytest.MonkeyPatch, cancel: bool
+) -> None:
     started, finish = Event(), Event()
 
     def blocked(data: bytes) -> None:

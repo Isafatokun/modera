@@ -47,7 +47,9 @@ class Policy(PolicyModel):
             raise ValueError("a policy must define text or image rules")
         for rules in (self.text, self.image):
             if len(rules) != len({rule.category for rule in rules}):
-                raise ValueError("rule categories must be unique within each input type")
+                raise ValueError(
+                    "rule categories must be unique within each input type"
+                )
         return self
 
     def rules_for(self, input_type: InputType) -> tuple[PolicyRule, ...]:
@@ -80,15 +82,22 @@ def load_policies(path: Path | None) -> Mapping[str, Policy]:
             raise ValueError("policy configuration exceeds 1 MiB")
         config = PolicyConfig.model_validate_json(content)
     except (OSError, ValidationError):
-        raise ValueError("policy configuration could not be loaded or is invalid") from None
+        raise ValueError(
+            "policy configuration could not be loaded or is invalid"
+        ) from None
     return MappingProxyType({policy.id: policy for policy in config.policies})
 
 
-def resolve_policy(policies: Mapping[str, Policy], name: str, input_type: InputType) -> Policy:
+def resolve_policy(
+    policies: Mapping[str, Policy], name: str, input_type: InputType
+) -> Policy:
     policy = policies.get(name)
     if policy is None:
         raise APIError(
-            400, "unknown_policy", "The selected policy is not configured.", param="policy"
+            400,
+            "unknown_policy",
+            "The selected policy is not configured.",
+            param="policy",
         )
     if not policy.rules_for(input_type):
         raise APIError(
@@ -101,7 +110,10 @@ def resolve_policy(policies: Mapping[str, Policy], name: str, input_type: InputT
 
 
 def evaluate_policy(
-    policy: Policy, input_type: InputType, findings: Sequence[Finding], coverage: Coverage
+    policy: Policy,
+    input_type: InputType,
+    findings: Sequence[Finding],
+    coverage: Coverage,
 ) -> Decision:
     scores = {finding.category: finding.score for finding in findings}
     if len(scores) != len(findings) or set(scores) != set(coverage.evaluated):
@@ -118,7 +130,10 @@ def evaluate_policy(
     for rule in rules:
         if rule.category in scores:
             continue
-        if rule.category in coverage.unsupported or rule.category in coverage.not_applicable:
+        if (
+            rule.category in coverage.unsupported
+            or rule.category in coverage.not_applicable
+        ):
             if rule.required:
                 raise APIError(
                     400,
@@ -138,19 +153,24 @@ def evaluate_policy(
     applicable = [rule for rule in rules if rule.category in scores]
     if not applicable:
         raise APIError(
-            400, "policy_not_applicable", "No policy checks apply to this input.", param="policy"
+            400,
+            "policy_not_applicable",
+            "No policy checks apply to this input.",
+            param="policy",
         )
     blocked = [
         rule.category
         for rule in applicable
-        if rule.block_threshold is not None and scores[rule.category] >= rule.block_threshold
+        if rule.block_threshold is not None
+        and scores[rule.category] >= rule.block_threshold
     ]
     if blocked:
         return Decision(action="block", reasons=blocked)
     reviewed = [
         rule.category
         for rule in applicable
-        if rule.review_threshold is not None and scores[rule.category] >= rule.review_threshold
+        if rule.review_threshold is not None
+        and scores[rule.category] >= rule.review_threshold
     ]
     if reviewed:
         return Decision(action="review", reasons=reviewed)

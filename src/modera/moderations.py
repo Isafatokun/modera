@@ -13,13 +13,20 @@ from modera.auth import authenticate
 from modera.errors import APIError, ErrorResponse, validation_error
 from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
-from modera.schemas import MAX_IMAGE_BYTES, ImageInput, ImageUploadRequest, ModerationRequest
+from modera.schemas import (
+    MAX_IMAGE_BYTES,
+    ImageInput,
+    ImageUploadRequest,
+    ModerationRequest,
+)
 
 MAX_JSON_BYTES = 32 * 1024
 MAX_MULTIPART_BYTES = 9 * 1024 * 1024
 BODY_TIMEOUT_SECONDS = 15
 
-router = APIRouter(prefix="/v1", tags=["moderations"], dependencies=[Depends(authenticate)])
+router = APIRouter(
+    prefix="/v1", tags=["moderations"], dependencies=[Depends(authenticate)]
+)
 
 
 class CompleteMultipartParser(MultiPartParser):
@@ -73,14 +80,21 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
         ) from exc
     try:
         if len(form.multi_items()) != len(form):
-            raise APIError(400, "invalid_request", "Duplicate form fields are not allowed.")
+            raise APIError(
+                400, "invalid_request", "Duplicate form fields are not allowed."
+            )
         upload = ImageUploadRequest.model_validate(dict(form))
         if not upload.file.size:
             raise APIError(
-                400, "invalid_request", "The image file must not be empty.", param="file"
+                400,
+                "invalid_request",
+                "The image file must not be empty.",
+                param="file",
             )
         if upload.file.size > MAX_IMAGE_BYTES:
-            raise APIError(413, "payload_too_large", "The image file is too large.", param="file")
+            raise APIError(
+                413, "payload_too_large", "The image file is too large.", param="file"
+            )
         return upload.policy, await upload.file.read(MAX_IMAGE_BYTES + 1)
     finally:
         await form.close()
@@ -91,7 +105,10 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
     status_code=501,
     response_model=None,
     summary="Moderate text or an image",
-    description="Request validation only. Valid requests return 501 until moderation is available.",
+    description=(
+        "Request validation only. "
+        "Valid requests return 501 until moderation is available."
+    ),
     responses={
         status: {"model": ErrorResponse, "description": description}
         for status, description in {
@@ -109,7 +126,9 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
         "requestBody": {
             "required": True,
             "content": {
-                "application/json": {"schema": {"$ref": "#/components/schemas/ModerationRequest"}},
+                "application/json": {
+                    "schema": {"$ref": "#/components/schemas/ModerationRequest"}
+                },
                 "multipart/form-data": {
                     "schema": {"$ref": "#/components/schemas/ImageUploadRequest"}
                 },
@@ -125,7 +144,9 @@ async def moderate(request: Request) -> NoReturn:
             "Content encoding is not supported.",
             headers={"Accept-Encoding": "identity"},
         )
-    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    media_type = (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    )
     try:
         async with asyncio.timeout(BODY_TIMEOUT_SECONDS):
             match media_type:
@@ -145,7 +166,10 @@ async def moderate(request: Request) -> NoReturn:
                     )
     except TimeoutError as exc:
         raise APIError(
-            408, "request_timeout", "The request body deadline was exceeded.", retryable=True
+            408,
+            "request_timeout",
+            "The request body deadline was exceeded.",
+            retryable=True,
         ) from exc
     except ValidationError as exc:
         raise validation_error(exc) from exc
@@ -155,7 +179,9 @@ async def moderate(request: Request) -> NoReturn:
     if is_url:
         downloader = request.app.state.downloads
         if downloader is None:
-            raise APIError(503, "service_not_ready", "The service is not ready.", retryable=True)
+            raise APIError(
+                503, "service_not_ready", "The service is not ready.", retryable=True
+            )
         assert isinstance(payload.input, ImageInput)
         image_data = await downloader.fetch(payload.input.source.url)
     if media_type == "multipart/form-data" or is_url:
