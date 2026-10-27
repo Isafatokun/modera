@@ -62,6 +62,9 @@ or weights. Each process loads its own model copies; account for startup memory 
 The initial adapters use FP32; quantization and ONNX execution are not implemented.
 When using a model file, mount it read-only and set its cache paths to the mounted
 cache location inside the container.
+The container runs as UID/GID `10001:10001`; configuration, weights and parent
+directories must be readable/traversable by that identity. Prepare the cache as
+that user or grant suitable group access before mounting it read-only.
 
 ## Text rules and fallback
 

@@ -36,6 +36,8 @@ def test_inference_container_with_read_only_cache_and_restart(
 ) -> None:
     model_file, policy_file = image_deployment
     tmp_path.chmod(0o755)
+    for weights in tmp_path.rglob("*.safetensors"):
+        weights.chmod(0o644)
     name = f"modera-test-{uuid4().hex}"
     environment = dict(os.environ)
     environment["MODERA_API_KEY"] = auth_headers["Authorization"][7:]
