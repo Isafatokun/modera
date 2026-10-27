@@ -97,7 +97,11 @@ def test_inference_container_with_read_only_cache_and_restart(
                         if client.get("/health/ready").status_code == 200:
                             break
                     except httpx.HTTPError:
-                        pass
+                        if (
+                            docker("inspect", "--format", "{{.State.Running}}", name)
+                            != "true"
+                        ):
+                            pytest.fail("container exited: " + docker("logs", name))
                     time.sleep(0.1)
                 else:
                     pytest.fail(

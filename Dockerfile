@@ -12,9 +12,12 @@ RUN if [ "$INFERENCE" = "true" ]; then uv sync --locked --no-dev --no-editable -
 FROM python:3.12-slim AS runtime
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
+ARG INFERENCE=false
+RUN if [ "$INFERENCE" = "true" ]; then apt-get update && apt-get install -y --no-install-recommends libstdc++6 && rm -rf /var/lib/apt/lists/*; fi
 RUN groupadd --gid 10001 modera && useradd --uid 10001 --gid modera --no-create-home modera
 COPY --from=builder /app/.venv /app/.venv
 USER 10001:10001
+RUN if [ "$INFERENCE" = "true" ]; then python -c "import torch; import transformers"; fi
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"
