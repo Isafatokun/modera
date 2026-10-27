@@ -379,6 +379,7 @@ dependencies = [
 
 [package.optional-dependencies]
 inference = [
+    { name = "huggingface-hub" },
     { name = "torch", version = "2.14.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.14.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
     { name = "transformers" },
@@ -400,6 +401,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.5,<4" },
     { name = "fastapi", specifier = ">=0.141.1,<0.142" },
+    { name = "huggingface-hub", marker = "extra == 'inference'", specifier = ">=2.3,<3" },
     { name = "pillow", specifier = ">=13.0.0,<14" },
     { name = "prometheus-client", specifier = ">=0.24,<0.25" },
     { name = "pydantic-settings", specifier = ">=2.0,<3" },

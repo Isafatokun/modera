@@ -13,3 +13,4 @@ build/
 .env.*
 !.env.example
 benchmarks/results/
+model-cache/

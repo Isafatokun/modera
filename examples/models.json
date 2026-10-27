@@ -1,0 +1,14 @@
+{
+  "text": {
+    "id": "Horizon-Labs/multilingual-toxicity-small",
+    "revision": "01adcc628a33848569816d4851a38544c321b92c",
+    "label_map": {"toxicity": "toxicity"},
+    "cache_dir": "../model-cache"
+  },
+  "image": {
+    "id": "AdamCodd/vit-base-nsfw-detector",
+    "revision": "8587de998f441aac03fdd57a85d2e4cb808c7d64",
+    "label_map": {"nsfw": "sexual"},
+    "cache_dir": "../model-cache"
+  }
+}

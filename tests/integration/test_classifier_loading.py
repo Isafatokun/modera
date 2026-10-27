@@ -1,3 +1,7 @@
+import json
+import os
+import subprocess
+import sys
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -131,8 +135,28 @@ def test_real_photo_loader_and_safe_weights_only(
         '{"policies":[{"id":"default","version":"1",'
         '"image":[{"category":"sexual","block_threshold":0.8}]}]}'
     )
+    model_file = tmp_path / "models.json"
+    model_file.write_text(json.dumps({"image": settings.model_dump(mode="json")}))
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("MODERA_")}
+    environment["HF_HUB_OFFLINE"] = "1"
+    prepared = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "modera.prepare_models",
+            "--config",
+            str(model_file),
+            "--offline",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert prepared.returncode == 0, prepared.stderr
+    assert json.loads(prepared.stdout)["ready"]
     with TestClient(
-        create_app(Settings(image_model=settings, policy_file=policy)),
+        create_app(Settings(model_file=model_file, policy_file=policy)),
         headers=auth_headers,
     ) as client:
         opens: list[object] = []

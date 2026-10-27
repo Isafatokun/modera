@@ -7,6 +7,7 @@ Implemented and tested:
 
 - Shared text, photo-file and photo-URL contract; authenticated requests and limits.
 - Pinned local classifiers, explicit label mappings, configurable policies and text fallback.
+- A shared model configuration file and preparation command with offline verification.
 - Bounded photo waiting, stage deadlines, cancellation, shutdown and recovery.
 - One decoded image shared with preparation; explicit image ownership and cleanup.
 - Real-model integration checks, rules example over HTTP, health and protected metrics.

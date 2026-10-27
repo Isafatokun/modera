@@ -38,6 +38,7 @@ curl http://127.0.0.1:8000/v1/moderations \
 | `MODERA_IMAGE_QUEUE_WAIT_SECONDS` | `2` | Maximum photo queue wait, within each stage's deadline |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
 | `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
+| `MODERA_MODEL_FILE` | Unset | Text/photo model configuration; alternative to individual model settings |
 | `MODERA_TEXT_MODEL__ID` / `__REVISION` | Unset | Text model ID and full commit SHA |
 | `MODERA_IMAGE_MODEL__ID` / `__REVISION` | Unset | Photo model ID and full commit SHA |
 | `MODERA_IMAGE_ALLOWED_HOSTS` | `[]` | JSON array of exact DNS hostnames allowed for image downloads |
