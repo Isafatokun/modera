@@ -71,6 +71,9 @@ and overload behavior.
 
 ## Container
 
+For working text/photo models, preparation and request checks, use the
+[Docker Compose reference setup](deploy/reference/README.md).
+
 ```sh
 docker build -t modera:local .
 docker run --rm --init --read-only --cap-drop=ALL \

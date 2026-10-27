@@ -1,0 +1,70 @@
+x-runtime: &runtime
+  image: ${MODERA_IMAGE:-modera:local}
+  build:
+    context: .
+    args:
+      INFERENCE: "true"
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp]
+
+services:
+  prepare:
+    <<: *runtime
+    command: [python, -m, modera.prepare_models, --config, /etc/modera/models.json]
+    environment:
+      HF_HOME: /var/cache/modera
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    volumes:
+      - ${MODERA_MODELS_FILE:-./deploy/reference/models.json}:/etc/modera/models.json:ro
+      - models:/var/cache/modera
+    healthcheck:
+      disable: true
+
+  modera:
+    <<: *runtime
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+    environment:
+      MODERA_API_KEY: ${MODERA_API_KEY:?Export MODERA_API_KEY before starting}
+      MODERA_MODEL_FILE: /etc/modera/models.json
+      MODERA_POLICY_FILE: /etc/modera/policies.json
+      MODERA_IMAGE_ALLOWED_HOSTS: ${MODERA_IMAGE_ALLOWED_HOSTS:-[]}
+      HF_HOME: /var/cache/modera
+      HF_HUB_OFFLINE: "1"
+    ports:
+      - 127.0.0.1:${MODERA_PORT:-8000}:8000
+    volumes:
+      - ${MODERA_MODELS_FILE:-./deploy/reference/models.json}:/etc/modera/models.json:ro
+      - ${MODERA_POLICIES_FILE:-./deploy/reference/policies.json}:/etc/modera/policies.json:ro
+      - models:/var/cache/modera:ro
+    stop_grace_period: 45s
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+      retries: 12
+
+  check:
+    <<: *runtime
+    profiles: [checks]
+    depends_on:
+      modera:
+        condition: service_healthy
+    command: [python, /checks/check_service.py]
+    environment:
+      MODERA_API_KEY: ${MODERA_API_KEY:?Export MODERA_API_KEY before starting}
+      MODERA_CHECK_BASE_URL: http://modera:8000
+      MODERA_CHECK_IMAGE_URL: ${MODERA_CHECK_IMAGE_URL:-}
+      MODERA_CHECK_UNAVAILABLE_URL: ${MODERA_CHECK_UNAVAILABLE_URL:-}
+    volumes:
+      - ./examples/check_service.py:/checks/check_service.py:ro
+    healthcheck:
+      disable: true
+
+volumes:
+  models:
