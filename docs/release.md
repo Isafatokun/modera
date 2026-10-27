@@ -10,11 +10,13 @@ Implemented and tested:
 - A shared model configuration file and preparation command with offline verification.
 - Bounded photo waiting, stage deadlines, cancellation, shutdown and recovery.
 - One decoded image shared with preparation; explicit image ownership and cleanup.
-- Real-model integration checks, rules example over HTTP, health and protected metrics.
+- Real-model HTTP startup, active-request draining, shutdown, restart and missing-weight
+  failure; rules example, health and protected metrics.
 
 Before an external release:
 
-- Validate the container and target deployment, including loaded-model shutdown.
+- Validate the container build and target deployment, including ingress removal and
+  the platform's final termination deadline.
 - Publish reference model/policy profiles with verified licences, category meanings,
   language coverage and independent quality evidence; preserve known limitations.
 - Run hosted CI and review the release branch before publishing a version.

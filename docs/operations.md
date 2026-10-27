@@ -49,10 +49,38 @@ Put connection/request limits and TLS at the ingress as well: application admiss
 does not bound connections or bytes buffered by the HTTP server or proxy.
 
 Waiting jobs are process-local and are not submitted to a hidden executor queue.
-Shutdown rejects waiting/new work; already running native work may finish. Nothing
-is durable across restart. Bounded waiting absorbs short bursts, not sustained
-overload; it does not coordinate separate instances or increase model throughput.
+Worker cleanup rejects remaining waiting/new work; already running native work may
+finish. Nothing is durable across restart. Bounded waiting absorbs short bursts,
+not sustained overload; it does not coordinate separate instances or increase
+model throughput.
 
 Integration tests exercise concurrent request saturation, rejection, cancellation,
 and recovery. They verify behavior, not deployment throughput or model capacity.
 For real-model HTTP measurements, run the [capacity benchmark](../benchmarks/README.md).
+
+## Startup and shutdown
+
+Model loading and warmup finish before readiness and HTTP serving. Missing or
+incompatible weights fail startup, unless the configured text fallback applies.
+Use `/health/ready` for traffic routing and `/health/live` for liveness; allow
+enough startup time for the selected models on the deployment hardware.
+
+The container explicitly runs one worker, even if `WEB_CONCURRENCY` is set.
+On `SIGTERM`, Uvicorn stops accepting connections and drains accepted requests
+before application cleanup. Its request-drain timeout is 30 seconds. Configure
+the platform's termination grace period above that, for example 45 seconds, and
+remove the instance from ingress routing before termination. Native inference
+cannot be forcibly cancelled by this timeout; the platform must enforce the final
+process termination deadline. An interrupted request has no saved result and may
+need retrying against another instance.
+
+Reproduce the process checks with:
+
+```sh
+uv run --locked --extra inference pytest tests/integration/test_service_process.py -q
+```
+
+These cover authenticated HTTP requests, real local classifier loading, draining
+an active photo request, `SIGTERM`, restart and missing-weight startup failure.
+The tiny test classifier verifies the lifecycle, not moderation quality. Container
+builds, ingress behavior and platform termination still need deployment testing.
