@@ -31,7 +31,8 @@ local cache only. Loading requires safetensors and disables remote model code.
 Models load and warm on their serving workers before readiness; missing
 weights, incompatible architecture and invalid label mappings normally fail startup.
 Telemetry is disabled before importing inference libraries. Inference uses one slot
-per modality per process, with no waiting queue. Text and photos can run concurrently,
+per modality per process; photos have [bounded waiting](operations.md), while text
+rejects immediately when busy. Text and photos can run concurrently,
 using their existing model instances. Threads default to 2 per model operation;
 the deadline defaults to 5 seconds
 (`MODERA_INFERENCE_THREADS`, `MODERA_INFERENCE_TIMEOUT_SECONDS`). Timed-out native

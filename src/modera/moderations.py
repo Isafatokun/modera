@@ -12,6 +12,7 @@ from modera.admission import admit_request
 from modera.auth import authenticate
 from modera.engine import ModerationEngine
 from modera.errors import APIError, ErrorResponse, validation_error
+from modera.inference import PreparedImage
 from modera.policies import InputType, resolve_policy
 from modera.results import ModerationResult
 from modera.schemas import (
@@ -138,7 +139,7 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
 )
 async def moderate(request: Request, response: Response) -> ModerationResult:
     response.headers["Cache-Control"] = "no-store"
-    content: str | bytes = ""
+    content: str | bytes | PreparedImage = ""
     if request.headers.get("content-encoding", "identity").lower() != "identity":
         raise APIError(
             415,
@@ -180,6 +181,7 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
     if request.app.state.policies:
         resolve_policy(request.app.state.policies, policy_name, input_type)
     is_url = media_type == "application/json" and isinstance(payload.input, ImageInput)
+    engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
     if is_url:
         downloader = request.app.state.downloads
         if downloader is None:
@@ -199,13 +201,17 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
                 headers={"Retry-After": "1"},
             )
         try:
-            await validator.validate(image_data)
+            preprocessor = engine.image_preprocessor if engine is not None else None
+            if preprocessor is None:
+                await validator.validate(image_data)
+                content = image_data
+            else:
+                content = await validator.prepare(image_data, preprocessor)
         except APIError as exc:
             if is_url and exc.param == "file":
                 exc.param = "input.source.url"
             raise
-        content = image_data
-    engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
+        del image_data
     if engine is None or not request.app.state.ready:
         raise APIError(
             503,

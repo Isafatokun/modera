@@ -47,15 +47,17 @@ Files are closed after reading; image data is not retained as a stored asset.
 | Deadlines | 15 seconds for the body; 5 seconds for image validation |
 | Downloads | 4 per instance, no waiting queue; 20-second total deadline |
 | Download recovery | At most 2 attempts; 8 seconds each, 3-second inactivity timeout |
-| Inference | One slot/process; default 5-second deadline; text model defaults to 256 tokens |
+| Inference | One slot/modality/process; default 5-second deadline; text model defaults to 256 tokens |
 | Policy name | 1–64 ASCII letters, digits, underscores, or hyphens |
 
 Body limits apply without `Content-Length`. Compressed bodies are unsupported.
 With a policy file, names and input types are checked; without one, only identifier
 syntax is validated. See [policy configuration](policies.md).
 
-Image decoding runs off the event loop, one job per instance with no decode queue.
-Timed-out native work keeps its slot until completion; excess work returns retryable `503`.
+Photo validation/preparation and inference run off the event loop. Each stage
+permits five waiting jobs by default, with up to two seconds of queue waiting
+within its deadline. Full queues return `503 service_busy`; expired waits return
+`503 queue_wait_timeout`. Timed-out native work keeps its slot until completion.
 
 Interrupted or stalled downloads restart once from byte zero with jitter; partial bytes
 are discarded. Each attempt resolves and validates the destination again. Permanent
@@ -128,7 +130,7 @@ settings, label mappings, and rule configuration. See [fallback semantics](model
 | `422` | `input_too_long` (model token limit), `invalid_image` (undecodable data), `input_fetch_rejected` (source rejection, redirect, invalid response, or TLS failure) |
 | `500` | `internal_error`; no decision |
 | `501` | `moderation_not_implemented`; no backend configured, not retryable |
-| `503` | `service_not_ready`, `service_busy`, `image_processing_timeout`, `input_fetch_failed`, `check_unavailable`; retryable, `Retry-After: 1` |
+| `503` | `service_not_ready`, `service_busy`, `queue_wait_timeout`, `image_processing_timeout`, `input_fetch_failed`, `check_unavailable`; retryable, `Retry-After: 1` |
 
 Policy [coverage failures](policies.md) return errors rather than an allow decision.
 
@@ -137,6 +139,10 @@ Use `code`, not message text, for control flow. Validation reports the first err
 are omitted. Unexpected errors log only request ID and exception type. Errors include
 `Cache-Control: no-store`; their request ID matches the `X-Request-ID` header.
 
-Retryable means another attempt may succeed. Respect `Retry-After` and bound retries;
-Modera does not queue or resume work. OpenAPI: `/openapi.json` when enabled, with bearer
+Retryable means another attempt may succeed. Respect `Retry-After`, use bounded
+attempts with jitter and an overall deadline. A retry runs a new evaluation with
+a new request ID; requests are not deduplicated or replayed. Modera stores no
+result or business action, so retrying creates no duplicate moderation side effect.
+URL bytes and model/policy configuration can change between attempts. Pending
+work does not survive restart. OpenAPI: `/openapi.json` when enabled, with bearer
 authentication documented. Health checks and enabled documentation are unauthenticated.

@@ -31,8 +31,13 @@ using the chosen models, instance resources, media sizes, and representative tra
 
 `MODERA_MAX_IN_FLIGHT_REQUESTS` defaults to 8 per process. After authentication,
 excess requests receive `503 service_busy` with `Retry-After: 1` before their body
-is read. Image download, validation, and inference have additional bounded capacity;
-there is no waiting queue. Health checks and metric scrapes bypass these limits.
+is read. Photo validation/preparation and inference each have one active slot and
+a bounded FIFO: `MODERA_IMAGE_QUEUE_SIZE=5`, with at most
+`MODERA_IMAGE_QUEUE_WAIT_SECONDS=2` seconds of waiting inside the stage deadline.
+Set queue size to `0` for immediate rejection. A full queue returns `503 service_busy`;
+an expired wait returns `503 queue_wait_timeout`. Both include `Retry-After: 1`.
+Downloads and text inference remain fail-fast. Health checks and scrapes bypass
+these limits.
 Text and photo inference each have one slot and reuse their loaded model. A busy
 photo model does not occupy the text inference slot, or vice versa. This separates
 inference admission; HTTP admission, CPU, memory, and the interpreter remain shared.
@@ -42,6 +47,11 @@ timeout or cancellation releases its HTTP slot, but native work keeps its worker
 slot until completion. This prevents retries from accumulating hidden native work.
 Put connection/request limits and TLS at the ingress as well: application admission
 does not bound connections or bytes buffered by the HTTP server or proxy.
+
+Waiting jobs are process-local and are not submitted to a hidden executor queue.
+Shutdown rejects waiting/new work; already running native work may finish. Nothing
+is durable across restart. Bounded waiting absorbs short bursts, not sustained
+overload; it does not coordinate separate instances or increase model throughput.
 
 Integration tests exercise concurrent request saturation, rejection, cancellation,
 and recovery. They verify behavior, not deployment throughput or model capacity.

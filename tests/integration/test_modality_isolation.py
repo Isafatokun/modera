@@ -63,6 +63,7 @@ def test_modalities_have_independent_bounded_capacity(
                 id="example/image", revision="b" * 40, label_map={"nsfw": "sexual"}
             ),
             inference_timeout_seconds=0.3 if outcome == "timeout" else 5,
+            image_queue_size=0,
         )
     )
 

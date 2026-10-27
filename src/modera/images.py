@@ -1,13 +1,14 @@
 import asyncio
 import warnings
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections.abc import Callable
+from contextlib import closing
 from io import BytesIO
-from threading import Lock
 
 from PIL import Image, features
 
 from modera.errors import APIError
 from modera.schemas import MAX_IMAGE_BYTES
+from modera.workers import BoundedWorker
 
 MAX_IMAGE_PIXELS = 16_000_000
 IMAGE_VALIDATION_SECONDS = 5
@@ -15,7 +16,7 @@ FORMATS = ("JPEG", "PNG", "WEBP")
 warnings.filterwarnings("error", category=Image.DecompressionBombWarning)
 
 
-def validate_image(data: bytes) -> None:
+def decode_image(data: bytes) -> Image.Image:
     if len(data) > MAX_IMAGE_BYTES:
         raise APIError(
             413, "payload_too_large", "The image file is too large.", param="file"
@@ -49,8 +50,13 @@ def validate_image(data: bytes) -> None:
                     param="file",
                 )
             image.verify()
-        with Image.open(BytesIO(data), formats=FORMATS) as image:
+        image = Image.open(BytesIO(data), formats=FORMATS)
+        try:
             image.load()
+            return image
+        except BaseException:
+            image.close()
+            raise
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
         raise APIError(
             413, "image_too_large", "The image exceeds the pixel limit.", param="file"
@@ -61,51 +67,49 @@ def validate_image(data: bytes) -> None:
         ) from exc
 
 
+def validate_image(data: bytes) -> None:
+    with closing(decode_image(data)):
+        pass
+
+
 class ImageValidator:
-    def __init__(self) -> None:
+    def __init__(self, queue_size: int = 0, wait_seconds: float = 2) -> None:
         if not all(features.check(codec) for codec in ("jpg", "zlib", "webp")):
             raise RuntimeError("required image codecs are unavailable")
-        self._executor = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="modera-image"
-        )
-        self._lock = Lock()
-        self._busy = False
-        self._closed = False
+        self._worker = BoundedWorker("modera-image", queue_size, wait_seconds)
 
-    def _release(self, _future: Future[None]) -> None:
-        with self._lock:
-            self._busy = False
-
-    async def validate(self, data: bytes) -> None:
-        with self._lock:
-            if self._closed or self._busy:
-                raise APIError(
-                    503,
-                    "service_busy",
-                    "Image validation is temporarily unavailable.",
-                    retryable=True,
-                    headers={"Retry-After": "1"},
-                )
-            self._busy = True
-            try:
-                future = self._executor.submit(validate_image, data)
-            except BaseException:
-                self._busy = False
-                raise
-        future.add_done_callback(self._release)
+    async def _run[T](self, operation: Callable[[], T]) -> T:
         try:
             async with asyncio.timeout(IMAGE_VALIDATION_SECONDS):
-                await asyncio.wrap_future(future)
+                return await self._worker.run(operation)
         except TimeoutError as exc:
             raise APIError(
                 503,
                 "image_processing_timeout",
-                "Image validation exceeded its deadline.",
+                "Image processing exceeded its deadline.",
+                retryable=True,
+                headers={"Retry-After": "1"},
+            ) from exc
+        except APIError:
+            raise
+        except Exception as exc:
+            raise APIError(
+                503,
+                "check_unavailable",
+                "Image preparation did not complete.",
                 retryable=True,
                 headers={"Retry-After": "1"},
             ) from exc
 
+    async def validate(self, data: bytes) -> None:
+        await self._run(lambda: validate_image(data))
+
+    async def prepare[T](self, data: bytes, operation: Callable[[Image.Image], T]) -> T:
+        def prepared() -> T:
+            with closing(decode_image(data)) as image:
+                return operation(image)
+
+        return await self._run(prepared)
+
     def close(self) -> None:
-        with self._lock:
-            self._closed = True
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        self._worker.close()

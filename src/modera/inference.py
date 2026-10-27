@@ -2,16 +2,23 @@ import asyncio
 import importlib
 import os
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import ExitStack, closing
+from dataclasses import dataclass
 from io import BytesIO
-from threading import Lock
 from typing import Any
 
-from PIL import Image, ImageOps
+from PIL import ExifTags, Image, ImageOps
 
 from modera.errors import APIError
+from modera.images import decode_image
 from modera.model_config import ImageModelSettings, TextModelSettings
 from modera.results import Finding
+from modera.workers import BoundedWorker
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class PreparedImage:
+    inputs: dict[str, Any]
 
 
 class Classifier:
@@ -88,7 +95,19 @@ class Classifier:
                 image.save(buffer, format="PNG")
                 self.predict(buffer.getvalue())
 
-    def predict(self, content: str | bytes) -> list[Finding]:
+    def prepare_image(self, image: Image.Image) -> PreparedImage:
+        if not isinstance(self.settings, ImageModelSettings):
+            raise TypeError("image preparation requires an image classifier")
+        with ExitStack() as owned:
+            oriented = image
+            if image.getexif().get(ExifTags.Base.Orientation) in range(2, 9):
+                oriented = owned.enter_context(closing(ImageOps.exif_transpose(image)))
+            rgb = oriented
+            if oriented.mode != "RGB":
+                rgb = owned.enter_context(closing(oriented.convert("RGB")))
+            return PreparedImage(dict(self._processor(images=rgb, return_tensors="pt")))
+
+    def predict(self, content: str | bytes | PreparedImage) -> list[Finding]:
         if isinstance(self.settings, TextModelSettings):
             if not isinstance(content, str):
                 raise TypeError("text classifier requires text")
@@ -101,14 +120,12 @@ class Classifier:
                     param="input.text",
                 )
         else:
-            if not isinstance(content, bytes):
+            if isinstance(content, bytes):
+                with closing(decode_image(content)) as image:
+                    content = self.prepare_image(image)
+            if not isinstance(content, PreparedImage):
                 raise TypeError("image classifier requires image bytes")
-            with (
-                Image.open(BytesIO(content)) as image,
-                ImageOps.exif_transpose(image) as oriented,
-                oriented.convert("RGB") as rgb,
-            ):
-                inputs = self._processor(images=rgb, return_tensors="pt")
+            inputs = content.inputs
         with self._torch.inference_mode():
             logits = self._model(**inputs).logits
             if (
@@ -129,46 +146,19 @@ class Classifier:
 
 
 class InferenceWorker:
-    def __init__(self, timeout: float) -> None:
-        self._executor = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="modera-inference"
-        )
-        self._lock = Lock()
-        self._busy = False
-        self._closed = False
+    def __init__(
+        self, timeout: float, queue_size: int = 0, wait_seconds: float = 2
+    ) -> None:
+        self._worker = BoundedWorker("modera-inference", queue_size, wait_seconds)
         self._timeout = timeout
 
-    def _release[T](self, _future: Future[T]) -> None:
-        with self._lock:
-            self._busy = False
-
-    def _submit[T](self, operation: Callable[[], T]) -> Future[T]:
-        with self._lock:
-            if self._busy or self._closed:
-                raise APIError(
-                    503,
-                    "service_busy",
-                    "Inference is temporarily unavailable.",
-                    retryable=True,
-                    headers={"Retry-After": "1"},
-                )
-            self._busy = True
-            try:
-                future = self._executor.submit(operation)
-            except BaseException:
-                self._busy = False
-                raise
-        future.add_done_callback(self._release)
-        return future
-
     async def initialize[T](self, operation: Callable[[], T]) -> T:
-        return await asyncio.wrap_future(self._submit(operation))
+        return await self._worker.run(operation)
 
     async def run(self, operation: Callable[[], list[Finding]]) -> list[Finding]:
-        future = self._submit(operation)
         try:
             async with asyncio.timeout(self._timeout):
-                return await asyncio.wrap_future(future)
+                return await self._worker.run(operation)
         except APIError:
             raise
         except Exception as exc:
@@ -181,6 +171,4 @@ class InferenceWorker:
             ) from exc
 
     def close(self) -> None:
-        with self._lock:
-            self._closed = True
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        self._worker.close()

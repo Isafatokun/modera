@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     max_in_flight_requests: Annotated[int, Field(ge=1, le=256)] = 8
     inference_threads: Annotated[int, Field(ge=1, le=32)] = 2
     inference_timeout_seconds: Annotated[float, Field(gt=0, le=60)] = 5.0
+    image_queue_size: Annotated[int, Field(ge=0, le=32)] = 5
+    image_queue_wait_seconds: Annotated[float, Field(gt=0, le=10)] = 2.0
     image_allowed_hosts: tuple[str, ...] = ()
 
     @field_validator("image_allowed_hosts")
