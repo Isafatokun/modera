@@ -12,10 +12,11 @@ Implemented and tested:
 - One decoded image shared with preparation; explicit image ownership and cleanup.
 - Real-model HTTP startup, active-request draining, shutdown, restart and missing-weight
   failure; rules example, health and protected metrics.
+- Container checks for authentication, codecs, rules and read-only inference restart.
 
 Before an external release:
 
-- Validate the container build and target deployment, including ingress removal and
+- Validate the target deployment, including ingress removal and
   the platform's final termination deadline.
 - Publish reference model/policy profiles with verified licences, category meanings,
   language coverage and independent quality evidence; preserve known limitations.

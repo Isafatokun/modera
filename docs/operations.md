@@ -82,5 +82,13 @@ uv run --locked --extra inference pytest tests/integration/test_service_process.
 
 These cover authenticated HTTP requests, real local classifier loading, draining
 an active photo request, `SIGTERM`, restart and missing-weight startup failure.
-The tiny test classifier verifies the lifecycle, not moderation quality. Container
-builds, ingress behavior and platform termination still need deployment testing.
+The tiny test classifier verifies the lifecycle, not moderation quality. To check
+the inference container with a read-only filesystem/cache and a stop/start:
+
+```sh
+docker build --build-arg INFERENCE=true -t modera:smoke .
+MODERA_TEST_CONTAINER_IMAGE=modera:smoke uv run --locked --extra inference pytest tests/integration/test_container.py -q
+```
+
+CI runs both checks. Ingress behavior and platform termination still need target
+deployment testing.
