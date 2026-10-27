@@ -13,6 +13,7 @@ from modera.inference import Classifier, InferenceWorker, PreparedImage
 from modera.policies import InputType, Policy, evaluate_policy
 from modera.results import Coverage, ModelVersion, ModerationResult, PolicyVersion
 from modera.rules import load_rules
+from modera.workers import WorkerCapacity
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,9 @@ class ModerationEngine:
             if input_type == "image"
             else self._settings.text_model or self._rules
         )
+
+    def worker_capacity(self, input_type: InputType) -> WorkerCapacity:
+        return self._workers[input_type].capacity
 
     @property
     def image_preprocessor(self) -> Callable[[Image.Image], PreparedImage] | None:

@@ -13,7 +13,7 @@ from modera.errors import APIError
 from modera.images import decode_image
 from modera.model_config import ImageModelSettings, TextModelSettings
 from modera.results import Finding
-from modera.workers import BoundedWorker
+from modera.workers import BoundedWorker, WorkerCapacity
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -151,6 +151,10 @@ class InferenceWorker:
     ) -> None:
         self._worker = BoundedWorker("modera-inference", queue_size, wait_seconds)
         self._timeout = timeout
+
+    @property
+    def capacity(self) -> WorkerCapacity:
+        return self._worker.capacity
 
     async def initialize[T](self, operation: Callable[[], T]) -> T:
         return await self._worker.run(operation)

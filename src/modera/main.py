@@ -38,6 +38,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
             resources.callback(images.close)
             app.state.images = images
+            measurements: Metrics = app.state.metrics
+            measurements.observe_worker(
+                "text_inference", lambda: engine.worker_capacity("text")
+            )
+            measurements.observe_worker(
+                "image_inference", lambda: engine.worker_capacity("image")
+            )
+            measurements.observe_worker("image_preparation", lambda: images.capacity)
             downloads = ImageDownloader(app.state.image_allowed_hosts)
             resources.push_async_callback(downloads.close)
             app.state.downloads = downloads

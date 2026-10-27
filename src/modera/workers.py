@@ -3,8 +3,14 @@ from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
+from typing import NamedTuple
 
 from modera.errors import APIError
+
+
+class WorkerCapacity(NamedTuple):
+    active: int
+    waiting: int
 
 
 def unavailable(code: str = "service_busy") -> APIError:
@@ -30,6 +36,10 @@ class BoundedWorker:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._active = False
         self._closed = False
+
+    @property
+    def capacity(self) -> WorkerCapacity:
+        return WorkerCapacity(int(self._active), len(self._waiters))
 
     def _release(self) -> None:
         while self._waiters:

@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from time import perf_counter
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
 from prometheus_client import (
@@ -13,6 +15,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from modera.auth import authenticate
+from modera.workers import WorkerCapacity
 
 router = APIRouter(dependencies=[Depends(authenticate)])
 
@@ -37,6 +40,26 @@ class Metrics:
             "Moderation HTTP requests currently being handled, including rejections.",
             registry=self.registry,
         )
+        self.worker_active = Gauge(
+            "modera_worker_active",
+            "Occupied native worker slots, including work after HTTP cancellation.",
+            ["worker"],
+            registry=self.registry,
+        )
+        self.worker_waiting = Gauge(
+            "modera_worker_waiting",
+            "Jobs waiting for a native worker slot.",
+            ["worker"],
+            registry=self.registry,
+        )
+
+    def observe_worker(
+        self,
+        worker: Literal["text_inference", "image_inference", "image_preparation"],
+        capacity: Callable[[], WorkerCapacity],
+    ) -> None:
+        self.worker_active.labels(worker).set_function(lambda: capacity().active)
+        self.worker_waiting.labels(worker).set_function(lambda: capacity().waiting)
 
 
 class MetricsMiddleware:
