@@ -68,7 +68,7 @@ def test_partial_startup_failure_closes_already_created_resources(
         original(value)
         closed.append(True)
 
-    def invalid_images() -> None:
+    def invalid_images(queue_size: int, wait_seconds: float) -> None:
         raise RuntimeError("required image codecs are unavailable")
 
     monkeypatch.setattr(ModerationEngine, "close", close)

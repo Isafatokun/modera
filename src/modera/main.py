@@ -32,7 +32,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             engine = ModerationEngine(app.state.settings, app.state.policies)
             resources.callback(engine.close)
             app.state.engine = engine
-            images = ImageValidator()
+            images = ImageValidator(
+                app.state.settings.image_queue_size,
+                app.state.settings.image_queue_wait_seconds,
+            )
             resources.callback(images.close)
             app.state.images = images
             downloads = ImageDownloader(app.state.image_allowed_hosts)

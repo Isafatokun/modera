@@ -58,6 +58,7 @@ def test_overload_does_not_block_health_or_queue_decodes(
             raise RuntimeError("test worker was not released")
 
     monkeypatch.setattr(images, "validate_image", blocked)
+    monkeypatch.setenv("MODERA_IMAGE_QUEUE_SIZE", "0")
 
     async def scenario() -> None:
         app = create_app()

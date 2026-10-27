@@ -178,3 +178,43 @@ def test_missing_codecs_fail_startup(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(features, "check", lambda codec: False)
     with pytest.raises(RuntimeError, match="required image codecs"):
         ImageValidator()
+
+
+def test_preparation_owns_and_closes_decoded_pixels(image_bytes: bytes) -> None:
+    captured: list[Image.Image] = []
+
+    def prepare(image: Image.Image) -> tuple[int, int]:
+        captured.append(image)
+        return image.size
+
+    async def run() -> None:
+        validator = ImageValidator()
+        try:
+            assert await validator.prepare(image_bytes, prepare) == (2, 2)
+            with pytest.raises(ValueError, match="closed"):
+                captured[0].getpixel((0, 0))
+        finally:
+            validator.close()
+
+    asyncio.run(run())
+
+
+def test_preparation_failure_is_sanitized_and_releases_capacity(
+    image_bytes: bytes,
+) -> None:
+    def fail(image: Image.Image) -> None:
+        raise RuntimeError("private image source")
+
+    async def run() -> None:
+        validator = ImageValidator()
+        try:
+            with pytest.raises(APIError) as error:
+                await validator.prepare(image_bytes, fail)
+            assert error.value.code == "check_unavailable"
+            assert error.value.retryable
+            assert "private" not in error.value.message
+            await validator.validate(image_bytes)
+        finally:
+            validator.close()
+
+    asyncio.run(run())

@@ -1,12 +1,19 @@
+import json
+import os
+import subprocess
+import sys
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 
+from modera.config import Settings
 from modera.errors import APIError
 from modera.inference import Classifier
+from modera.main import create_app
 from modera.model_config import ImageModelSettings, TextModelSettings
 
 REVISION = "a" * 40
@@ -76,7 +83,7 @@ def test_real_text_loader_rejects_silent_truncation_and_bad_label_maps(
 
 @pytest.mark.inference
 def test_real_photo_loader_and_safe_weights_only(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
     pytest.importorskip("torch")
     transformers = pytest.importorskip("transformers")
@@ -123,3 +130,48 @@ def test_real_photo_loader_and_safe_weights_only(
     assert calls[0]["local_files_only"] is True
     assert calls[0]["trust_remote_code"] is False
     assert calls[0]["use_safetensors"] is True
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        '{"policies":[{"id":"default","version":"1",'
+        '"image":[{"category":"sexual","block_threshold":0.8}]}]}'
+    )
+    model_file = tmp_path / "models.json"
+    model_file.write_text(json.dumps({"image": settings.model_dump(mode="json")}))
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("MODERA_")}
+    environment["HF_HUB_OFFLINE"] = "1"
+    prepared = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "modera.prepare_models",
+            "--config",
+            str(model_file),
+            "--offline",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert prepared.returncode == 0, prepared.stderr
+    assert json.loads(prepared.stdout)["ready"]
+    with TestClient(
+        create_app(Settings(model_file=model_file, policy_file=policy)),
+        headers=auth_headers,
+    ) as client:
+        opens: list[object] = []
+        original_open = Image.open
+
+        def counted_open(*args: Any, **kwargs: Any) -> Image.Image:
+            opens.append(args[0])
+            return original_open(*args, **kwargs)
+
+        monkeypatch.setattr(Image, "open", counted_open)
+        with BytesIO() as buffer, Image.new("RGB", (16, 16), "white") as image:
+            image.save(buffer, format="PNG")
+            response = client.post(
+                "/v1/moderations", files={"file": ("photo.png", buffer.getvalue())}
+            )
+        assert response.status_code == 200
+        assert len(opens) == 2
+        assert response.json()["models"][0]["revision"] == REVISION

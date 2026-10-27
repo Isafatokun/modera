@@ -13,19 +13,32 @@ Requires Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installa
 ```sh
 uv sync --locked
 export MODERA_API_KEY="$(uv run --locked python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+MODERA_POLICY_FILE=examples/policies.json \
+MODERA_TEXT_RULES_FILE=examples/text-rules.json \
 uv run --locked uvicorn modera.main:create_app --factory --reload
 ```
 
-The server binds to localhost. Use `--reload` only for development.
+The server binds to localhost. Use `--reload` only for development. This example
+enables literal text rules; it does not load a model. In another shell with the
+same API key, this returns `block`:
+
+```sh
+curl http://127.0.0.1:8000/v1/moderations \
+  -H "Authorization: Bearer $MODERA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"input":{"type":"text","text":"example prohibited phrase"},"policy":"rules-only"}'
+```
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
-| `MODERA_MAX_IN_FLIGHT_REQUESTS` | `8` | Maximum active moderation requests per process; no waiting queue |
+| `MODERA_MAX_IN_FLIGHT_REQUESTS` | `8` | Maximum active HTTP moderation requests per process; excess requests rejected immediately |
+| `MODERA_IMAGE_QUEUE_SIZE` | `5` | Waiting photo jobs per processing stage; `0` rejects immediately when busy |
+| `MODERA_IMAGE_QUEUE_WAIT_SECONDS` | `2` | Maximum photo queue wait, within each stage's deadline |
 | `MODERA_DOCS_ENABLED` | `false` | Enable `/docs` and `/openapi.json` |
 | `MODERA_POLICY_FILE` | Unset | Path to a validated policy JSON file |
+| `MODERA_MODEL_FILE` | Unset | Text/photo model configuration; alternative to individual model settings |
 | `MODERA_TEXT_MODEL__ID` / `__REVISION` | Unset | Text model ID and full commit SHA |
 | `MODERA_IMAGE_MODEL__ID` / `__REVISION` | Unset | Photo model ID and full commit SHA |
 | `MODERA_IMAGE_ALLOWED_HOSTS` | `[]` | JSON array of exact DNS hostnames allowed for image downloads |

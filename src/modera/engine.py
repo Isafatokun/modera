@@ -1,12 +1,15 @@
 import hashlib
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import partial
+from typing import cast
+
+from PIL import Image
 
 from modera.config import Settings
 from modera.errors import APIError
-from modera.inference import Classifier, InferenceWorker
+from modera.inference import Classifier, InferenceWorker, PreparedImage
 from modera.policies import InputType, Policy, evaluate_policy
 from modera.results import Coverage, ModelVersion, ModerationResult, PolicyVersion
 from modera.rules import load_rules
@@ -60,7 +63,11 @@ class ModerationEngine:
         self._text: Classifier | None = None
         self._image: Classifier | None = None
         self._workers = {
-            kind: InferenceWorker(settings.inference_timeout_seconds)
+            kind: InferenceWorker(
+                settings.inference_timeout_seconds,
+                settings.image_queue_size if kind == "image" else 0,
+                settings.image_queue_wait_seconds,
+            )
             for kind in ("text", "image")
         }
 
@@ -69,6 +76,15 @@ class ModerationEngine:
             self._settings.image_model
             if input_type == "image"
             else self._settings.text_model or self._rules
+        )
+
+    @property
+    def image_preprocessor(self) -> Callable[[Image.Image], PreparedImage] | None:
+        preprocessor = getattr(self._image, "prepare_image", None)
+        return (
+            cast(Callable[[Image.Image], PreparedImage], preprocessor)
+            if callable(preprocessor)
+            else None
         )
 
     async def start(self) -> None:
@@ -111,7 +127,7 @@ class ModerationEngine:
     async def evaluate(
         self,
         input_type: InputType,
-        content: str | bytes,
+        content: str | bytes | PreparedImage,
         policy: Policy,
         request_id: str,
     ) -> ModerationResult:
