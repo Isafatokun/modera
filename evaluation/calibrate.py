@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import json
 import math
 from collections import defaultdict
@@ -207,13 +208,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        cases = [
-            CalibrationCase.model_validate(row)
-            for row in json.loads(args.cases.read_bytes())
-        ]
+        case_data = args.cases.read_bytes()
+        result_data = args.validation_results.read_bytes()
+        cases = [CalibrationCase.model_validate(row) for row in json.loads(case_data)]
         observations = [
-            Observation.model_validate_json(line)
-            for line in args.validation_results.read_bytes().splitlines()
+            Observation.model_validate_json(line) for line in result_data.splitlines()
         ]
         category = PolicyRule(category=args.category, review_threshold=0.5).category
         budget = Budget(
@@ -222,8 +221,8 @@ def main() -> None:
         )
         result = calibrate(cases, observations, category, budget)
         result["inputs"] = {
-            "cases_sha256": digest_file(args.cases),
-            "validation_results_sha256": digest_file(args.validation_results),
+            "cases_sha256": hashlib.sha256(case_data).hexdigest(),
+            "validation_results_sha256": hashlib.sha256(result_data).hexdigest(),
         }
         result["calibrator_sha256"] = digest_file(Path(__file__))
         args.output.parent.mkdir(parents=True, exist_ok=True)

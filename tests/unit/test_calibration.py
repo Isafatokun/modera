@@ -395,3 +395,61 @@ def test_cli_records_infeasibility_without_emitting_policy_rule(
     assert report["status"] == "no_candidate"
     assert report["threshold"] is None
     assert report["policy_rule"] is None
+
+
+def test_fingerprints_bind_to_consumed_bytes_when_source_changes(
+    dataset: tuple[list[CalibrationCase], list[Observation]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib
+    import sys
+
+    module = importlib.import_module("evaluation.calibrate")
+    original_calibrate = module.calibrate
+    cases, results = dataset
+    manifest, observed, output = (
+        tmp_path / "cases.json",
+        tmp_path / "results.jsonl",
+        tmp_path / "proposal.json",
+    )
+    case_data = json.dumps(
+        [row.model_dump(exclude_none=True) for row in cases]
+    ).encode()
+    result_data = ("\n".join(row.model_dump_json() for row in results) + "\n").encode()
+    manifest.write_bytes(case_data)
+    observed.write_bytes(result_data)
+
+    def change_sources(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        proposal: dict[str, Any] = original_calibrate(*args, **kwargs)
+        manifest.write_bytes(b"changed")
+        observed.write_bytes(b"changed")
+        return proposal
+
+    monkeypatch.setattr(module, "calibrate", change_sources)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "calibrate",
+            "--cases",
+            str(manifest),
+            "--validation-results",
+            str(observed),
+            "--category",
+            "toxicity",
+            "--max-false-positive-rate",
+            "0",
+            "--min-recall",
+            "1",
+            "--output",
+            str(output),
+        ],
+    )
+    main()
+    report = json.loads(output.read_bytes())
+    assert report["inputs"]["cases_sha256"] == hashlib.sha256(case_data).hexdigest()
+    assert (
+        report["inputs"]["validation_results_sha256"]
+        == hashlib.sha256(result_data).hexdigest()
+    )
