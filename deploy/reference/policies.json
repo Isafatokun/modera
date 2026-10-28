@@ -1,0 +1,15 @@
+{
+  "policies": [
+    {
+      "id": "default",
+      "version": "reference-1",
+      "text": [
+        {"category": "toxicity", "review_threshold": 0.5, "block_threshold": 0.85}
+      ],
+      "image": [
+        {"category": "classifier.porn", "block_threshold": 0.95},
+        {"category": "classifier.hentai", "block_threshold": 0.95}
+      ]
+    }
+  ]
+}

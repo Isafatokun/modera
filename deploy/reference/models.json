@@ -1,0 +1,23 @@
+{
+  "text": {
+    "id": "Horizon-Labs/multilingual-toxicity-small",
+    "revision": "01adcc628a33848569816d4851a38544c321b92c",
+    "activation": "sigmoid",
+    "max_tokens": 256,
+    "label_map": {"toxicity": "toxicity"},
+    "cache_dir": "/var/cache/modera/hub"
+  },
+  "image": {
+    "id": "viddexa/nsfw-detection-2-mini",
+    "revision": "15f61cddc0a1a2a9176f018fb6838ef92c8163cc",
+    "activation": "softmax",
+    "label_map": {
+      "safe": "classifier.safe",
+      "porn": "classifier.porn",
+      "hentai": "classifier.hentai",
+      "sexy": "classifier.sexy",
+      "drawing": "classifier.drawing"
+    },
+    "cache_dir": "/var/cache/modera/hub"
+  }
+}

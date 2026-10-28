@@ -65,11 +65,14 @@ Health checks need no credentials: `/health/live` checks HTTP availability;
 `/health/ready` checks readiness for the configured model/rules mode. Successful checks return
 `{"status":"ok"}`. Every application HTTP response includes `X-Request-ID`.
 
-`GET /metrics` exposes Prometheus request counts, latency, and active requests; it
-requires the same bearer key. See [operations](docs/operations.md) for deployment
+`GET /metrics` exposes Prometheus request counts, latency, worker occupancy and queue
+depths. It requires the same bearer key. See [operations](docs/operations.md) for deployment
 and overload behavior.
 
 ## Container
+
+For working text/photo models, preparation and request checks, use the
+[Docker Compose reference setup](deploy/reference/README.md).
 
 ```sh
 docker build -t modera:local .

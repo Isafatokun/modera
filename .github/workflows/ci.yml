@@ -28,7 +28,7 @@ jobs:
       - run: uv sync --locked --group benchmark
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked --group benchmark mypy src tests benchmarks
+      - run: uv run --locked --group benchmark mypy src tests benchmarks examples
       - name: Check benchmark entry points
         run: |
           uv run --locked --group benchmark python benchmarks/run.py --help
@@ -59,7 +59,8 @@ jobs:
       - name: Verify read-only inference container and restart
         env:
           MODERA_TEST_CONTAINER_IMAGE: modera:ci-inference
-        run: uv run --locked --extra inference pytest tests/integration/test_container.py -q
+          MODERA_TEST_LIVE_SOURCES: '1'
+        run: uv run --locked --extra inference pytest tests/integration/test_container.py tests/integration/test_compose.py -q
 
   container:
     runs-on: ubuntu-latest

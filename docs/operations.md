@@ -16,11 +16,18 @@ its secret store. Keep the endpoint behind the deployment's network controls.
 | `modera_moderation_requests_total{status_code}` | Completed moderation HTTP responses by status; `0` means the response did not complete, such as cancellation |
 | `modera_moderation_request_duration_seconds` | Histogram covering body reading, validation, downloads, inference, and response sending, including failures |
 | `modera_moderation_requests_in_flight` | Active moderation HTTP requests, including requests being rejected |
+| `modera_worker_active{worker}` | Occupied worker slot (`0` or `1`), including native work that outlives its HTTP request |
+| `modera_worker_waiting{worker}` | Jobs currently waiting for that worker slot |
 
-Only `POST /v1/moderations` is measured. Scrapes, health checks, and other paths are
-excluded. Labels contain no content, URLs, policy/model IDs, credentials, or request
-IDs. Counters reset on restart; the monitoring system retains history. HTTP activity
-does not measure native inference still running after an HTTP timeout/cancellation.
+HTTP counters and latency cover only `POST /v1/moderations`; scrapes, health checks
+and other paths are excluded. Worker labels are fixed: `text_inference`,
+`image_inference`, `image_preparation`. Gauges sample current slot/queue occupancy;
+cancelled or expired waiters are removed. A busy native worker can remain active
+after HTTP requests fall to zero. Downloads and literal text rules are not included
+in these worker gauges.
+
+Labels contain no content, URLs, policy/model IDs, credentials, or request IDs.
+Counters reset on restart; the monitoring system retains history.
 
 Track the `503` rate alongside latency and active requests. A `503` can indicate
 request capacity, an occupied inference/validation worker, or an unavailable check;

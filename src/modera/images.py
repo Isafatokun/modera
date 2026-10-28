@@ -8,7 +8,7 @@ from PIL import Image, features
 
 from modera.errors import APIError
 from modera.schemas import MAX_IMAGE_BYTES
-from modera.workers import BoundedWorker
+from modera.workers import BoundedWorker, WorkerCapacity
 
 MAX_IMAGE_PIXELS = 16_000_000
 IMAGE_VALIDATION_SECONDS = 5
@@ -77,6 +77,10 @@ class ImageValidator:
         if not all(features.check(codec) for codec in ("jpg", "zlib", "webp")):
             raise RuntimeError("required image codecs are unavailable")
         self._worker = BoundedWorker("modera-image", queue_size, wait_seconds)
+
+    @property
+    def capacity(self) -> WorkerCapacity:
+        return self._worker.capacity
 
     async def _run[T](self, operation: Callable[[], T]) -> T:
         try:

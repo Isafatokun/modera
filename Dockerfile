@@ -14,6 +14,7 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 ARG INFERENCE=false
 RUN groupadd --gid 10001 modera && useradd --uid 10001 --gid modera --no-create-home modera
+RUN mkdir -p /var/cache/modera && chown 10001:10001 /var/cache/modera
 COPY --from=builder /app/.venv /app/.venv
 USER 10001:10001
 RUN if [ "$INFERENCE" = "true" ]; then python -c "import torch; import transformers"; fi
