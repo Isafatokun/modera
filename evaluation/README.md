@@ -57,3 +57,6 @@ comparison, not a new independent benchmark. Exact-match filtering cannot audit
 paraphrases, related sources or pretraining. Balanced samples do not represent
 production prevalence, and 50 examples per class/language give limited precision.
 Do not tune thresholds on this test and reuse it as independent validation.
+
+Use [policy calibration](calibration.md) to propose a review cutoff from your own
+labelled validation responses while reserving a separate held-out set.
