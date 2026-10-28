@@ -14,3 +14,5 @@ build/
 !.env.example
 benchmarks/results/
 model-cache/
+evaluation/data/
+evaluation/results/

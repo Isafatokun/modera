@@ -36,6 +36,9 @@ dev = [
     "pytest>=9,<10",
     "ruff>=0.17,<0.18",
 ]
+evaluation = [
+    "pyarrow>=26,<27",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/modera"]
