@@ -35,6 +35,7 @@ jobs:
           uv run --locked python benchmarks/prepare_models.py --help
           uv run --locked python benchmarks/server.py --help
           uv run --locked python -m evaluation.compare_text --help
+          uv run --locked python -m evaluation.diagnose --help
       - run: uv run --locked pytest
       - run: uv build
 

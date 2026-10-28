@@ -49,6 +49,13 @@ jobs:
           uv run --locked --extra inference --group evaluation python -m evaluation.compare_text run
           --directory evaluation/data/publisher-test --candidate evaluation/candidates/gravitee-distilbert.json
           --cache model-cache --output evaluation/results/gravitee-distilbert
+      - name: Diagnose ranking without selecting thresholds
+        run: |
+          for candidate in horizon-small gravitee-distilbert; do
+            uv run --locked --extra inference --group evaluation python -m evaluation.diagnose \
+              --directory evaluation/data/publisher-test --run "evaluation/results/$candidate" \
+              --output "evaluation/results/$candidate/diagnostic.json"
+          done
       - name: Print complete summaries
         run: |
           python - <<'PY'

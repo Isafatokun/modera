@@ -36,6 +36,19 @@ reports and predictions for 30 days, including partial predictions on failure.
 It uploads no raw texts, credentials or model weights. Local `data/` and `results/`
 are ignored by Git. See [results and limitations](results.md).
 
+To examine ranking across the full score range without fitting a test-set cutoff:
+
+```sh
+uv run --locked python -m evaluation.diagnose \
+  --directory evaluation/data/publisher-test --run evaluation/results/horizon-small \
+  --output evaluation/results/horizon-small/diagnostic.json
+```
+
+The diagnostic verifies sample and prediction fingerprints, handles tied scores,
+and reports ROC AUC by language with failure counts. It does not select a threshold.
+Use separate, representative validation data for calibration and new held-out data
+for the final assessment; these already-inspected cases are diagnostic evidence.
+
 Source: [publisher dataset](https://huggingface.co/datasets/gravitee-io/textdetox-multilingual-toxicity-dataset),
 revision `bc570f7558ab8cbd8d0d9a550c7406e8343fad90`, derived from TextDetox.
 The dataset and Gravitee classifier declare OpenRAIL++; Horizon declares Apache-2.0.

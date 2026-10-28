@@ -48,3 +48,32 @@ The [machine-readable record](recorded-results.json) preserves this distinction;
 fresh workflow runs generate new reports and raw predictions. See
 [reproduction and limitations](README.md). No model weights or dataset texts are
 included in this repository.
+
+## Ranking versus cutoff
+
+The saved, fingerprint-verified predictions also support a ranking diagnostic.
+ROC AUC measures whether toxic examples tend to score above benign examples;
+0.5 is chance-like ranking and 1 is perfect ranking on the evaluated sample.
+It is not accuracy at the current cutoff or a calibrated safety probability.
+
+| Slice | Horizon AUC | Gravitee AUC |
+| --- | ---: | ---: |
+| Mean across all 15 languages | 0.8351 | 0.9036 |
+| English | 0.9904 | 0.9924 |
+| French | 0.9920 | 0.9856 |
+| Hindi | 0.9104 | 0.9872 |
+| Amharic | 0.5844 | 0.6176 |
+
+French ranking is strong for both candidates; the missed toxic examples at 0.5
+should not be interpreted as uniformly poor discrimination. Hindi also illustrates
+why ranking quality and a fixed operating point differ. For Amharic, both models
+have weak ranking on this sample, so moving the cutoff alone cannot provide strong
+separation. AUC does not determine which operating point meets an application's
+false-positive budget. These small samples do not establish significant differences
+between close values or predict deployment performance.
+
+[Complete per-language diagnostics](ranking-results.json) retain completed-class
+counts and failures. The macro score is undefined if any language lacks a completed
+class. Three length-limit failures per model remain excluded from AUC and visible
+in those counts. No new cutoff was fitted, and these reused test cases are not
+independent calibration data.
