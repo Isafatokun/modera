@@ -59,4 +59,5 @@ production prevalence, and 50 examples per class/language give limited precision
 Do not tune thresholds on this test and reuse it as independent validation.
 
 Use [policy calibration](calibration.md) to propose a review cutoff from your own
-labelled validation responses while reserving a separate held-out set.
+labelled validation responses, then assess the frozen proposal on the reserved
+held-out set without retuning.

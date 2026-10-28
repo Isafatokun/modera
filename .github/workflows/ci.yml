@@ -37,6 +37,7 @@ jobs:
           uv run --locked python -m evaluation.compare_text --help
           uv run --locked python -m evaluation.diagnose --help
           uv run --locked python -m evaluation.calibrate --help
+          uv run --locked python -m evaluation.assess --help
       - run: uv run --locked pytest
       - run: uv build
 

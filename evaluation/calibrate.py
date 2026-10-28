@@ -7,12 +7,12 @@ from itertools import groupby
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from evaluation.compare_text import digest_file
 from evaluation.report import Name
 from modera.policies import InputType, PolicyRule
-from modera.results import ModerationResult, Score
+from modera.results import ModelVersion, ModerationResult, Score, Version
 
 
 class Observation(BaseModel):
@@ -43,6 +43,46 @@ class CalibrationCase(BaseModel):
         if self.split == "test" and self.expected is not None:
             raise ValueError("held-out labels must remain outside calibration")
         return self
+
+
+class ModelProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    input_type: InputType
+    models: list[ModelVersion] = Field(min_length=1)
+    preprocessing_version: Version
+    rules_version: Version | None
+
+    @field_validator("models")
+    @classmethod
+    def order_models(cls, models: list[ModelVersion]) -> list[ModelVersion]:
+        if len({model.id for model in models}) != len(models):
+            raise ValueError("model identifiers must be unique")
+        return sorted(models, key=lambda model: model.id)
+
+    @classmethod
+    def from_result(cls, result: ModerationResult) -> Self:
+        return cls(
+            input_type=result.input_type,
+            models=result.models,
+            preprocessing_version=result.preprocessing_version,
+            rules_version=result.rules_version,
+        )
+
+
+def partition_cases(
+    cases: list[CalibrationCase],
+) -> tuple[list[CalibrationCase], list[CalibrationCase]]:
+    if not cases or len({case.id for case in cases}) != len(cases):
+        raise ValueError("manifest must be nonempty with unique IDs")
+    validation = [case for case in cases if case.split == "validation"]
+    held_out = [case for case in cases if case.split == "test"]
+    if not validation or not held_out:
+        raise ValueError("both validation and held-out test cases are required")
+    if {case.group for case in validation} & {case.group for case in held_out}:
+        raise ValueError("source groups must not cross validation and test sets")
+    if len({case.input_type for case in cases}) != 1:
+        raise ValueError("calibrate one modality at a time")
+    return validation, held_out
 
 
 def select_cutoff(
@@ -107,16 +147,7 @@ def calibrate(
     category: str,
     budget: Budget,
 ) -> dict[str, Any]:
-    if not cases or len({case.id for case in cases}) != len(cases):
-        raise ValueError("manifest must be nonempty with unique IDs")
-    validation = [case for case in cases if case.split == "validation"]
-    held_out = [case for case in cases if case.split == "test"]
-    if not validation or not held_out:
-        raise ValueError("both validation and held-out test cases are required")
-    if {case.group for case in validation} & {case.group for case in held_out}:
-        raise ValueError("source groups must not cross validation and test sets")
-    if len({case.input_type for case in cases}) != 1:
-        raise ValueError("calibrate one modality at a time")
+    validation, held_out = partition_cases(cases)
     observed = {row.id: row.result for row in observations}
     if len(observed) != len(observations) or set(observed) != {
         case.id for case in validation
@@ -126,22 +157,14 @@ def calibrate(
         )
     if len({result.request_id for result in observed.values()}) != len(observed):
         raise ValueError("validation results must have distinct request IDs")
-    provenance: dict[str, Any] | None = None
+    provenance: ModelProvenance | None = None
     rows = []
     slices: dict[str, list[tuple[bool, float]]] = defaultdict(list)
     for case in validation:
         result = observed[case.id]
         if result.input_type != case.input_type or result.fallback:
             raise ValueError("result modality must match and fallback is not supported")
-        signature = {
-            "input_type": result.input_type,
-            "models": [
-                model.model_dump()
-                for model in sorted(result.models, key=lambda m: m.id)
-            ],
-            "preprocessing_version": result.preprocessing_version,
-            "rules_version": result.rules_version,
-        }
+        signature = ModelProvenance.from_result(result)
         if provenance is None:
             provenance = signature
         elif provenance != signature:
@@ -171,7 +194,7 @@ def calibrate(
         else None,
         "category": category,
         "budget": budget.model_dump(),
-        "provenance": provenance,
+        "provenance": provenance.model_dump(mode="json") if provenance else None,
         "validation_cases": len(validation),
         "validation_positive_cases": sum(label for label, _ in rows),
         "validation_negative_cases": sum(not label for label, _ in rows),

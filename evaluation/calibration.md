@@ -17,7 +17,8 @@ this category should be escalated; negatives use `allow`. Test entries omit labe
 [
   {"id":"v1","group":"session-1","split":"validation","input_type":"text","slice":"en","expected":"block"},
   {"id":"v2","group":"session-2","split":"validation","input_type":"text","slice":"en","expected":"allow"},
-  {"id":"t1","group":"session-3","split":"test","input_type":"text","slice":"en"}
+  {"id":"t1","group":"session-3","split":"test","input_type":"text","slice":"en"},
+  {"id":"t2","group":"session-4","split":"test","input_type":"text","slice":"en"}
 ]
 ```
 
@@ -53,3 +54,35 @@ existing output files are never overwritten. No inference is run and no server
 configuration is changed. After freezing a proposal, assess it on the held-out set
 and review the complete versioned policy before deployment. This does not calibrate
 an entire multi-rule policy or choose an automatic-blocking threshold.
+
+## Held-out assessment
+
+Freeze the proposal before unsealing test labels or scores. Keep the original
+manifest and validation responses unchanged. Supply separate test labels as a
+JSON array, for example `[{"id":"t1","expected":"block"},{"id":"t2","expected":"allow"}]`.
+Record every reserved test case in JSONL as either
+`{"id":"t1","result":{...complete API response...}}` or
+`{"id":"t1","error":"check_unavailable"}`. Include both label classes.
+
+```sh
+uv run --locked python -m evaluation.assess \
+  --proposal evaluation/results/review-proposal.json \
+  --cases evaluation/data/application-cases.json \
+  --validation-results evaluation/data/validation-results.jsonl \
+  --labels evaluation/data/test-labels.json \
+  --test-results evaluation/data/test-results.jsonl \
+  --output evaluation/results/test-assessment.json
+```
+
+Assessment applies the frozen review rule using the service's policy evaluator;
+it never selects another cutoff. It requires matching model/preprocessing
+provenance, distinct requests and exact reserved IDs. Hashes bind the original
+files, but cannot prove that data were unseen or independent.
+
+Exit 0 means both empirical targets passed on all test cases. Exit 2 writes a
+`failed` report for missed targets or `incomplete` for failed, fallback or missing
+model checks; these never become clean results. Invalid input exits 1. Reports
+include confusion counts, completion rate, recall across all cases and completed
+cases, false-positive rate on completed cases, slices and provenance. Inspect
+slices even when global targets pass. After changing a model, rule or threshold,
+use fresh held-out data; repeated tuning against this report invalidates the holdout.
