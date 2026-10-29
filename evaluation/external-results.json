@@ -1,0 +1,288 @@
+{
+  "date": "2026-10-29",
+  "recommendation": "No new production model or threshold recommendation; all four exploratory text calibration gates failed. Broad photo-quality validation remains incomplete.",
+  "text": {
+    "horizon-small": {
+      "candidate": {
+        "id": "Horizon-Labs/multilingual-toxicity-small",
+        "revision": "01adcc628a33848569816d4851a38544c321b92c",
+        "label_map": {
+          "toxicity": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "sigmoid",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "results": {
+        "toxifrench": {
+          "reference_review_0_5": {
+            "cases": 754,
+            "positive_cases": 363,
+            "negative_cases": 391,
+            "true_positive": 154,
+            "false_positive": 33,
+            "false_negative": 209,
+            "true_negative": 358,
+            "positive_failed": 0,
+            "negative_failed": 0,
+            "completed": 754,
+            "failed": 0,
+            "completion_rate": 1.0,
+            "recall_completed": 0.42424242424242425,
+            "recall_all_cases": 0.42424242424242425,
+            "false_positive_rate_completed": 0.08439897698209718
+          },
+          "proposal": {
+            "status": "no_candidate",
+            "threshold": null,
+            "validation_metrics": {
+              "true_positive": 94,
+              "false_positive": 15,
+              "false_negative": 237,
+              "true_negative": 288,
+              "recall": 0.283987915407855,
+              "false_positive_rate": 0.04950495049504951
+            }
+          },
+          "test_errors": {}
+        },
+        "toxigen": {
+          "reference_review_0_5": {
+            "cases": 466,
+            "positive_cases": 180,
+            "negative_cases": 286,
+            "true_positive": 44,
+            "false_positive": 24,
+            "false_negative": 136,
+            "true_negative": 262,
+            "positive_failed": 0,
+            "negative_failed": 0,
+            "completed": 466,
+            "failed": 0,
+            "completion_rate": 1.0,
+            "recall_completed": 0.24444444444444444,
+            "recall_all_cases": 0.24444444444444444,
+            "false_positive_rate_completed": 0.08391608391608392
+          },
+          "proposal": {
+            "status": "no_candidate",
+            "threshold": null,
+            "validation_metrics": {
+              "true_positive": 68,
+              "false_positive": 12,
+              "false_negative": 154,
+              "true_negative": 240,
+              "recall": 0.3063063063063063,
+              "false_positive_rate": 0.047619047619047616
+            }
+          },
+          "test_errors": {}
+        }
+      },
+      "collector_sha256": "5486076aa0f9e8df3329ce172f17f7f43c23c7cfd09c95a13cc0648cc28377e6",
+      "protocol_sha256": "fe6a8b427a05cb97b5ce1c5138cf2d6d5acd3a2b01aa1b45e22248dd2680b46f"
+    },
+    "gravitee-distilbert": {
+      "candidate": {
+        "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
+        "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
+        "label_map": {
+          "toxic": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "softmax",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "results": {
+        "toxifrench": {
+          "reference_review_0_5": {
+            "cases": 754,
+            "positive_cases": 363,
+            "negative_cases": 391,
+            "true_positive": 246,
+            "false_positive": 112,
+            "false_negative": 117,
+            "true_negative": 279,
+            "positive_failed": 0,
+            "negative_failed": 0,
+            "completed": 754,
+            "failed": 0,
+            "completion_rate": 1.0,
+            "recall_completed": 0.6776859504132231,
+            "recall_all_cases": 0.6776859504132231,
+            "false_positive_rate_completed": 0.2864450127877238
+          },
+          "proposal": {
+            "status": "no_candidate",
+            "threshold": null,
+            "validation_metrics": {
+              "true_positive": 64,
+              "false_positive": 15,
+              "false_negative": 267,
+              "true_negative": 288,
+              "recall": 0.1933534743202417,
+              "false_positive_rate": 0.04950495049504951
+            }
+          },
+          "test_errors": {}
+        },
+        "toxigen": {
+          "reference_review_0_5": {
+            "cases": 466,
+            "positive_cases": 180,
+            "negative_cases": 286,
+            "true_positive": 60,
+            "false_positive": 37,
+            "false_negative": 120,
+            "true_negative": 249,
+            "positive_failed": 0,
+            "negative_failed": 0,
+            "completed": 466,
+            "failed": 0,
+            "completion_rate": 1.0,
+            "recall_completed": 0.3333333333333333,
+            "recall_all_cases": 0.3333333333333333,
+            "false_positive_rate_completed": 0.12937062937062938
+          },
+          "proposal": {
+            "status": "no_candidate",
+            "threshold": null,
+            "validation_metrics": {
+              "true_positive": 48,
+              "false_positive": 12,
+              "false_negative": 174,
+              "true_negative": 240,
+              "recall": 0.21621621621621623,
+              "false_positive_rate": 0.047619047619047616
+            }
+          },
+          "test_errors": {}
+        }
+      },
+      "collector_sha256": "5486076aa0f9e8df3329ce172f17f7f43c23c7cfd09c95a13cc0648cc28377e6",
+      "protocol_sha256": "fe6a8b427a05cb97b5ce1c5138cf2d6d5acd3a2b01aa1b45e22248dd2680b46f"
+    }
+  },
+  "photo": {
+    "metrics": {
+      "cases": 84,
+      "positive_cases": 42,
+      "negative_cases": 42,
+      "true_positive": 1,
+      "false_positive": 2,
+      "false_negative": 41,
+      "true_negative": 40,
+      "positive_failed": 0,
+      "negative_failed": 0,
+      "completed": 84,
+      "failed": 0,
+      "completion_rate": 1.0,
+      "recall_completed": 0.023809523809523808,
+      "recall_all_cases": 0.023809523809523808,
+      "false_positive_rate_completed": 0.047619047619047616
+    },
+    "errors": {},
+    "scope": "Reference-policy escalation against broad sexual-safety labels; no calibration",
+    "limitations": "Small AI-generated, human-labelled sexual-safety challenge, not a natural-photo nudity benchmark or application calibration set. Unsafe sexual meaning may depend on rendered text and context, which this nudity classifier does not model. Labels describe sexual safety, not verified porn/hentai ground truth. No thresholds are fitted. Training overlap is unknown. The upstream repository does not provide a top-level dataset licence; images are not redistributed. UnsafeBench remains gated, and broad independent photo validation is outstanding.",
+    "collector_sha256": "6c557eaf1e52703460edc945b4daaf496b94f132a5a2d0710dc7d264de9e08da",
+    "predictions_sha256": "9ee9e9b1a4e7eec19326c5cb28363561e31a647c3894775874f0d6ffd2642be5"
+  },
+  "protocol": {
+    "version": "external-v1",
+    "sources": {
+      "toxifrench": {
+        "repo": "AxelDlv00/ToxiFrench",
+        "revision": "6280dba8a77ff27ca866a91b1098a6f4f24934e3",
+        "file": "data/test_dataset.csv",
+        "delimiter": ";",
+        "text": "content",
+        "label": "literal_conclusion_annotator",
+        "sha256": "3b0e0397239d5dcb78e534008eec317125fb3daea7c0e83a4f01e957225737b1"
+      },
+      "toxigen": {
+        "repo": "toxigen/toxigen-data",
+        "revision": "ea082a8973a287097b17973343576e0c8da8eb3b",
+        "file": "annotated_test.csv",
+        "delimiter": ",",
+        "text": "text",
+        "label": "toxicity_human",
+        "sha256": "31a15ddaec081f1799ef71b009e0c25dcc98142bc96f23487971317e4a865576"
+      }
+    },
+    "candidates": {
+      "gravitee-distilbert": {
+        "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
+        "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
+        "label_map": {
+          "toxic": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "softmax",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "horizon-small": {
+        "id": "Horizon-Labs/multilingual-toxicity-small",
+        "revision": "01adcc628a33848569816d4851a38544c321b92c",
+        "label_map": {
+          "toxicity": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "sigmoid",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      }
+    },
+    "exclusions": {
+      "toxifrench": {
+        "source_rows": 1388,
+        "duplicate_rows_collapsed": 0,
+        "input_limit_exclusions": 0,
+        "eligible": 1388
+      },
+      "toxigen": {
+        "source_rows": 940,
+        "duplicate_rows_collapsed": 0,
+        "input_limit_exclusions": 0,
+        "eligible": 940
+      }
+    },
+    "english_positive_label": "toxicity_human >= 3 on scale 1..5",
+    "budget": {
+      "max_false_positive_rate": 0.05,
+      "min_recall": 0.9
+    },
+    "budget_scope": "Exploratory review gate, separately per dataset; not a production SLA",
+    "split": "normalized exact-text group SHA-256 salted external-v1; first byte <128 validation",
+    "hashes": {
+      "cases.json": "f221f5c559353d5ae4c10c6d6f972f2919a5e2bc2c5ee0441555546060b4923b",
+      "validation-inputs.json": "fc531715279f05450bf1525e85d89e357de3d02a3cd43d9edccf461d5b41f7bb",
+      "sealed-test.json": "2021454dca9dde8b5f9b6473f8d696625dee6baf66f9a5694850641d87eeeb4d"
+    },
+    "limitations": "External-source diagnostic, not a representative application sample or proof of training independence. Deduplication checks normalized exact text only, not authors, threads, prompts, translations or near duplicates. ToxiFrench labels use a semi-automated pipeline with human verification; ToxiGen text is generated and human-rated. Separate dataset rates must not be pooled into a production claim. The supported-length cohort is frozen using both pinned tokenizers before scoring; excluded cases remain counted separately. No serving defaults are changed."
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "cpu_quota": "800000 100000",
+    "logical_cpus_visible": 9,
+    "packages": {
+      "torch": "2.14.1+cpu",
+      "transformers": "5.20.2",
+      "huggingface-hub": "2.3.0",
+      "pydantic": "2.14.1",
+      "fastapi": "0.141.1",
+      "pillow": "13.0.0"
+    }
+  },
+  "validation": {
+    "pytest": "484 passed, 2 Docker-only skips",
+    "lint": "passed",
+    "format": "passed",
+    "typing": "passed",
+    "build": "passed"
+  },
+  "limitations": "External sources are not proof of training independence or a representative application distribution. Photo rates measure broader contextual sexual safety rather than porn/hentai classification accuracy. No policy changes."
+}

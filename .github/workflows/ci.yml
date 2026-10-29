@@ -38,6 +38,8 @@ jobs:
           uv run --locked python -m evaluation.diagnose --help
           uv run --locked python -m evaluation.calibrate --help
           uv run --locked python -m evaluation.assess --help
+          uv run --locked python -m evaluation.external_text --help
+          uv run --locked python -m evaluation.photo_challenge --help
       - run: uv run --locked pytest
       - run: uv build
 
