@@ -38,7 +38,8 @@ Only generated neutral text and a white PNG are submitted.
    instance. SIGTERM then drains the accepted photo request successfully.
 4. Restarting and rejoining the stopped instance preserves the photo findings and
    model provenance while producing a new request ID.
-5. A deliberately unreleased inference call prevents normal exit. After a
+5. An explicit uncooperative-exit fault combines an unreleased inference call
+   with ignoring the final SIGTERM re-raised after Uvicorn cleanup. After a
    four-second grace period the harness sends SIGKILL, checks the process exit
    and verifies that the interrupted SDK call has an error and no decision.
    The remaining instance still handles a fresh request.
@@ -49,6 +50,11 @@ The gate is a bounded, local, rehearsal-only wrapper around the real classifier'
 prediction method. Once released, it invokes the original classifier. It creates
 no HTTP control endpoints, changes no serving code and is excluded from the
 runtime image. It is used because naturally slow requests are timing-dependent.
+The restarted test instance additionally uses `--stubborn-exit` to exercise the
+controller's forced-kill path. Normal Uvicorn restores its original signal handler
+and re-raises SIGTERM after shutdown, which can terminate a blocked native thread
+without needing SIGKILL. The fault mode explicitly suppresses that final exit; it
+is not a claim about the normal server. A process regression covers both modes.
 
 ## Scope and limits
 

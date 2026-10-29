@@ -1,6 +1,7 @@
 """Rehearsal-only inference gate. Never included in the serving image."""
 
 import argparse
+import signal
 import time
 from pathlib import Path
 
@@ -14,7 +15,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fd", type=int, required=True)
     parser.add_argument("--control", type=Path, required=True)
+    parser.add_argument("--stubborn-exit", action="store_true")
     args = parser.parse_args()
+    if args.stubborn_exit:
+        # Uvicorn still handles the initial TERM and drains normally. On return,
+        # it restores this handler and re-raises TERM. Ignoring that final signal
+        # leaves the gated native thread alive: an explicit exit fault, not the
+        # production server's normal behavior.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
     predict = Classifier.predict
 
     def gated(self: Classifier, content: str | bytes | PreparedImage) -> list[Finding]:
