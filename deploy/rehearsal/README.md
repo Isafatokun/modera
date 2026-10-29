@@ -34,7 +34,8 @@ Only generated neutral text and a white PNG are submitted.
    `Retry-After: 1`. The SDK observes that failure, waits at least the advertised
    delay and succeeds on its second attempt with a new request ID.
 3. With an active photo request, removing its instance from the NGINX upstream and
-   acknowledging the new configuration sends five fresh SDK requests to the other
+   acknowledging the new configuration and observing old workers close the listening
+   socket sends five fresh SDK requests to the other
    instance. SIGTERM then drains the accepted photo request successfully.
 4. Restarting and rejoining the stopped instance preserves the photo findings and
    model provenance while producing a new request ID.
@@ -60,7 +61,11 @@ is not a claim about the normal server. A process regression covers both modes.
 
 The gateway binds only to loopback, disables its own upstream retries, and uses
 fresh SDK connections for routing assertions. A generation header acknowledges
-that a reload took effect before shutdown begins. The upstream-address and
+that a reload took effect. This alone is insufficient: old workers can briefly
+continue accepting connections. The Linux `/proc` listener-ownership barrier
+waits for every old worker to close the listening socket before shutdown begins.
+Already accepted requests continue draining on those workers. Failure to inspect
+that ownership fails the check rather than substituting a fixed sleep. The upstream-address and
 generation headers are diagnostics for this isolated check, not recommended
 public response headers. Metrics/readiness remain reachable to the harness.
 NGINX authentication headers and structured Modera errors are passed through.

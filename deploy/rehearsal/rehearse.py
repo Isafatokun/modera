@@ -85,6 +85,29 @@ http {{
 """
 
 
+def listener_socket(port: int) -> str:
+    """Identify the IPv4 loopback listener shared by NGINX master/workers."""
+    address = f"0100007F:{port:04X}"
+    for line in Path("/proc/net/tcp").read_text().splitlines()[1:]:
+        columns = line.split()
+        if columns[1] == address and columns[3] == "0A":
+            return f"socket:[{columns[9]}]"
+    raise RuntimeError("gateway listening socket was not found")
+
+
+def owns_socket(pid: int, target: str) -> bool:
+    """A draining worker may live on, but must stop accepting new connections."""
+    try:
+        descriptors = list(Path(f"/proc/{pid}/fd").iterdir())
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    for descriptor in descriptors:
+        with suppress(FileNotFoundError, ProcessLookupError):
+            if os.readlink(descriptor) == target:
+                return True
+    return False
+
+
 class Rehearsal:
     def __init__(self, output: Path, nginx: str, stack: ExitStack) -> None:
         self.output, self.nginx, self.stack = output, nginx, stack
@@ -192,6 +215,18 @@ class Rehearsal:
         until(ready, f"instance {name} readiness timed out", 180)
 
     def route(self, names: list[str]) -> None:
+        old_workers: list[int] = []
+        listener = ""
+        if self.gateway is not None:
+            master = self.gateway.pid
+            old_workers = [
+                int(pid)
+                for pid in Path(f"/proc/{master}/task/{master}/children")
+                .read_text()
+                .split()
+            ]
+            require(old_workers, "gateway has no worker processes")
+            listener = listener_socket(self.port)
         generation = self.counter
         config = self.output / "nginx.conf"
         config.write_text(
@@ -222,6 +257,10 @@ class Rehearsal:
                 return False
 
         until(routed, "new gateway configuration was not acknowledged")
+        until(
+            lambda: all(not owns_socket(pid, listener) for pid in old_workers),
+            "old gateway workers still accept new connections",
+        )
 
     def submit(self, image: bool = False, attempts: int = 1) -> Request:
         self.counter += 1
