@@ -282,7 +282,49 @@ class Rehearsal:
             "modality/fallback mismatch",
         )
         require(
-            result["models"] == [{"id": model["id"], "revi…450 tokens truncated…
+            result["models"] == [{"id": model["id"], "revision": model["revision"]}],
+            "model provenance mismatch",
+        )
+        require(
+            result["policy"] == {"id": "default", "version": "reference-1"},
+            "policy mismatch",
+        )
+        return result, trace
+
+    def arm(self) -> Path:
+        control = self.instances["a"][2]
+        for marker in ("entered", "released"):
+            (control / marker).unlink(missing_ok=True)
+        (control / "armed").touch()
+        return control
+
+    def active(self, control: Path, request: Request) -> None:
+        def entered() -> bool:
+            require(request[0].poll() is None, "request exited before gate")
+            return (control / "entered").exists()
+
+        until(entered, "request did not enter real inference")
+
+    def check(self, name: str, **evidence: Any) -> None:
+        self.report["checks"].append({"name": name, **evidence})
+        print(name + ": passed", flush=True)
+
+    def execute(self, cache: Path, download: bool) -> None:
+        models = json.loads((ROOT / "deploy/reference/models.json").read_text())
+        for model in models.values():
+            model["cache_dir"] = str(cache.resolve())
+        (self.output / "models.json").write_text(json.dumps(models, indent=2) + "\n")
+        self.report.update(
+            models=models,
+            commit=subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+            ).strip(),
+        )
+        self.report["go_version"] = subprocess.check_output(
+            ["go", "version"], text=True
+        ).strip()
+        self.report["nginx_version"] = subprocess.run(
+            [self.nginx, "-v"], capture_output=True, text=True, check=True
         ).stderr.strip()
         if download:
             self.environment.pop("HF_HUB_OFFLINE")
