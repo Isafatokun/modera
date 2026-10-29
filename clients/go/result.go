@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// A missing or null score is not a zero score.
+// UnmarshalJSON rejects absent or null scores rather than treating them as zero.
 func (f *Finding) UnmarshalJSON(data []byte) error {
 	var value struct {
 		Category string   `json:"category"`
@@ -26,23 +26,32 @@ func (f *Finding) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Version identifies a versioned policy.
 type Version struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
 }
+
+// ModelVersion identifies a model and its artifact revision.
 type ModelVersion struct {
 	ID       string `json:"id"`
 	Revision string `json:"revision"`
 }
+
+// Decision contains the moderation action and triggering category names.
 type Decision struct {
 	Action  string   `json:"action"`
 	Reasons []string `json:"reasons"`
 }
+
+// Finding contains a category score and its model or rules source.
 type Finding struct {
 	Category string  `json:"category"`
 	Score    float64 `json:"score"`
 	Source   string  `json:"source"`
 }
+
+// Coverage distinguishes evaluated, unsupported, and inapplicable categories.
 type Coverage struct {
 	Evaluated     []string `json:"evaluated"`
 	Unsupported   []string `json:"unsupported"`

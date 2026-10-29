@@ -13,6 +13,7 @@ repository commit. Inside this checkout:
 cd clients/go
 go test -race ./...
 go vet ./...
+go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
 ```
 
 ## Use
@@ -66,7 +67,8 @@ Empty policy selects `default`. Text is preserved and never token-truncated.
   network I/O and retry waits using request contexts and the standard HTTP transport.
   Supplied transports must honor request contexts. Bounded local input preparation
   precedes the network/retry context.
-- Retries cover temporary transport failures and valid API errors marked retryable
+- Retries cover transport timeouts, interrupted connections (EOF/reset/broken
+  pipe), refused connections and valid API errors marked retryable
   on 408, 429 or 503. Ordinary validation/authentication errors, malformed responses,
   invalid certificates, unsupported backends and redirects are not retried.
 - Integer and HTTP-date `Retry-After` values are respected as minimum delays; they
@@ -89,7 +91,9 @@ formatting. URL credentials, queries and fragments are rejected.
 
 Use `errors.As(err, &apiError)` with `var apiError *modera.APIError` to inspect
 `Status`, `Code`, `RequestID`, effective `Retryable`, `RetryAfter`, and `Attempts`.
-Use `errors.Is` for `context.Canceled` and `context.DeadlineExceeded`.
+Use `errors.Is` for `context.Canceled` and `context.DeadlineExceeded`, including
+an exhausted per-attempt context deadline. A custom HTTP client or transport can
+report its own timeout independently of these contexts.
 `ProtocolError` means the client received no trustworthy API decision.
 
 Responses are bounded to 1 MiB and checked for action/coverage/finding/provenance

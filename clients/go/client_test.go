@@ -2,6 +2,7 @@ package modera
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -43,6 +45,13 @@ func TestTransientResponseIsRetriedAndImageBodyReplays(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+testKey {
 			t.Error("missing auth")
 		}
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		bodies = append(bodies, string(raw))
+		r.Body = io.NopCloser(strings.NewReader(string(raw)))
 		if err := r.ParseMultipartForm(9 << 20); err != nil {
 			t.Error(err)
 			return
@@ -55,7 +64,9 @@ func TestTransientResponseIsRetriedAndImageBodyReplays(t *testing.T) {
 		}
 		data, _ := io.ReadAll(file)
 		file.Close()
-		bodies = append(bodies, string(data))
+		if string(data) != "snapshot image bytes" {
+			t.Error("image payload changed")
+		}
 		if r.FormValue("policy") != "photos" {
 			t.Error("policy changed")
 		}
@@ -68,7 +79,7 @@ func TestTransientResponseIsRetriedAndImageBodyReplays(t *testing.T) {
 	}))
 	defer server.Close()
 	c := mustClient(t, server.URL, Options{})
-	c.random = func() float64 { return 0.5 }
+	c.random = func(n int64) int64 { return n / 2 }
 	var delays []time.Duration
 	c.wait = func(_ context.Context, d time.Duration) error { delays = append(delays, d); return nil }
 	result, err := c.ModerateImage(context.Background(), []byte("snapshot image bytes"), "photos")
@@ -190,7 +201,9 @@ func TestRedirectNeverForwardsCredentials(t *testing.T) {
 	targetCalls := 0
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { targetCalls++ }))
 	defer target.Close()
-	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, 307) }))
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
+	}))
 	defer source.Close()
 	_, err := mustClient(t, source.URL, Options{}).ModerateText(context.Background(), "hello", "")
 	if err == nil || targetCalls != 0 {
@@ -332,5 +345,70 @@ func TestExplicitPrivateHTTPOption(t *testing.T) {
 	}
 	if _, err := New("https://example.com?", testKey, Options{}); err == nil {
 		t.Fatal("empty query accepted")
+	}
+}
+
+// Wait for cancellation in a transport to exercise the final-attempt path
+// deterministically, without relying on scheduling of a local HTTP server.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestFinalAttemptPreservesDeadline(t *testing.T) {
+	var calls atomic.Int32
+	transport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		<-r.Context().Done()
+		return nil, r.Context().Err()
+	})
+	c := mustClient(t, "https://example.com", Options{
+		MaxAttempts: 2, AttemptTimeout: time.Millisecond,
+		TotalTimeout: time.Second, HTTPClient: &http.Client{Transport: transport},
+	})
+	c.wait = func(context.Context, time.Duration) error { return nil }
+	result, err := c.ModerateText(context.Background(), "hello", "")
+	if result != nil || !errors.Is(err, context.DeadlineExceeded) || calls.Load() != 2 {
+		t.Fatalf("result=%v error=%v calls=%d", result, err, calls.Load())
+	}
+}
+
+func TestBackoffRemainsBoundedAtMaximumDuration(t *testing.T) {
+	const maximum = time.Duration(1<<63 - 1)
+	c := mustClient(t, "https://example.com", Options{BaseDelay: maximum, MaxDelay: maximum})
+	c.random = func(n int64) int64 { return n - 1 }
+	for attempt := 1; attempt <= 5; attempt++ {
+		if delay := c.backoff(attempt); delay < 0 || delay >= maximum {
+			t.Fatalf("attempt %d: backoff overflowed: %v", attempt, delay)
+		}
+	}
+}
+
+func TestTransportRetryClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		failure   error
+		wantCalls int
+	}{
+		{"connection_reset", fmt.Errorf("wrapped: %w", syscall.ECONNRESET), 2},
+		{"broken_pipe", fmt.Errorf("wrapped: %w", syscall.EPIPE), 2},
+		{"invalid_certificate", x509.UnknownAuthorityError{}, 1},
+		{"permanent", errors.New("permanent transport failure"), 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			transport := roundTripFunc(func(*http.Request) (*http.Response, error) {
+				calls++
+				if calls == 1 {
+					return nil, tc.failure
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(valid("text")))}, nil
+			})
+			c := mustClient(t, "https://example.com", Options{HTTPClient: &http.Client{Transport: transport}})
+			c.wait = func(context.Context, time.Duration) error { return nil }
+			result, err := c.ModerateText(context.Background(), "hello", "")
+			if calls != tc.wantCalls || (err == nil) != (tc.wantCalls == 2) || (result != nil) != (err == nil) {
+				t.Fatalf("calls=%d result=%v error=%v", calls, result, err)
+			}
+		})
 	}
 }
