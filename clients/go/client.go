@@ -34,27 +34,40 @@ var categoryPattern = regexp.MustCompile(`^[a-z][a-z0-9_./-]{0,63}$`)
 // caller's earlier context deadline. Zero fields select defaults. AttemptTimeout
 // zero means each attempt uses the remaining total budget.
 type Options struct {
-	MaxAttempts    int
-	TotalTimeout   time.Duration
+	// MaxAttempts includes the initial request. Valid values are 1-5; default 3.
+	MaxAttempts int
+	// TotalTimeout bounds network attempts and retry waits; default 30 seconds.
+	TotalTimeout time.Duration
+	// AttemptTimeout bounds an individual attempt, including response reads.
 	AttemptTimeout time.Duration
-	BaseDelay      time.Duration
-	MaxDelay       time.Duration
-	HTTPClient     *http.Client
-	AllowHTTP      bool
+	// BaseDelay is the initial full-jitter backoff ceiling; default 200 ms.
+	BaseDelay time.Duration
+	// MaxDelay caps exponential backoff, but not Retry-After; default 2 seconds.
+	MaxDelay time.Duration
+	// HTTPClient is copied; its Transport and Jar remain shared and must support
+	// concurrent use. Do not modify them while requests are in flight. Redirects
+	// are disabled. Its own Timeout may further shorten an attempt.
+	HTTPClient *http.Client
+	// AllowHTTP permits plaintext HTTP outside loopback on trusted networks.
+	AllowHTTP bool
 }
 
 // Client is safe for concurrent use. It retains no moderation results.
+// Construct clients with New; the zero value is not usable.
 type Client struct {
 	endpoint string
 	apiKey   string
 	options  Options
 	http     *http.Client
-	random   func() float64
+	random   func(int64) int64
 	now      func() time.Time
 	wait     func(context.Context, time.Duration) error
 }
 
-func (c *Client) String() string   { return "modera.Client{credentials:redacted}" }
+// String returns a credential-redacted description.
+func (c *Client) String() string { return "modera.Client{credentials:redacted}" }
+
+// GoString returns a credential-redacted Go-syntax description.
 func (c *Client) GoString() string { return c.String() }
 
 // APIError is a valid API error. Error intentionally omits untrusted message text.
@@ -121,7 +134,7 @@ func New(baseURL, apiKey string, options Options) (*Client, error) {
 	h.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
 	u.Path = strings.TrimRight(u.Path, "/") + "/v1/moderations"
 	u.RawPath = ""
-	return &Client{endpoint: u.String(), apiKey: apiKey, options: options, http: &h, random: rand.Float64, now: time.Now, wait: waitContext}, nil
+	return &Client{endpoint: u.String(), apiKey: apiKey, options: options, http: &h, random: rand.Int64N, now: time.Now, wait: waitContext}, nil
 }
 
 func waitContext(ctx context.Context, d time.Duration) error {
@@ -229,6 +242,9 @@ func (c *Client) execute(parent context.Context, body []byte, contentType, kind,
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
+			if attempt == c.options.MaxAttempts && attemptErr != nil {
+				return nil, attemptErr
+			}
 			if attempt == c.options.MaxAttempts || (!retryTransport(err) && !errors.Is(attemptErr, context.DeadlineExceeded)) {
 				return nil, errors.New("modera: transport request failed")
 			}
@@ -312,7 +328,7 @@ func (c *Client) backoff(attempt int) time.Duration {
 		}
 		limit *= 2
 	}
-	return time.Duration(float64(min(limit, c.options.MaxDelay)) * c.random())
+	return time.Duration(c.random(int64(min(limit, c.options.MaxDelay))))
 }
 func retryAfter(header string, now time.Time) time.Duration {
 	if header != "" && strings.IndexFunc(header, func(r rune) bool { return r < '0' || r > '9' }) == -1 {
@@ -335,5 +351,5 @@ func retryTransport(err error) bool {
 		return false
 	}
 	var network net.Error
-	return (errors.As(err, &network) && (network.Timeout() || network.Temporary())) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED)
+	return (errors.As(err, &network) && network.Timeout()) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EPIPE)
 }
