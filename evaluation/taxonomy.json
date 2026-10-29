@@ -1,0 +1,16 @@
+{
+  "version": "draft-1",
+  "status": "proposed_annotation_definitions_not_a_serving_policy",
+  "labels": ["present", "absent", "uncertain"],
+  "categories": {
+    "targeted_abuse": {"input_type": "text", "definition": "Insults, degradation or harassment directed at a person or group. Distinguish criticism of an idea, familiar banter, reporting and counterspeech; use uncertain when context is missing."},
+    "identity_attack": {"input_type": "text", "definition": "Attacks, dehumanization or denial of rights based on identity. Identity mentions or discussion of discrimination alone are not attacks. Mark ambiguous quotation or missing context uncertain."},
+    "threat": {"input_type": "text", "definition": "Threats or encouragement of physical harm. Distinguish reporting, condemnation, fiction and idiom. Do not infer a real-world capability or legal conclusion."},
+    "sexual_explicit": {"input_type": "text", "definition": "Explicit sexual description, requests or sexual harassment. Record whether content is present, not whether a community should allow educational or medical discussion; the serving policy is separate."},
+    "explicit_nudity": {"input_type": "image", "definition": "Visible explicit nudity. Do not infer nudity under clothing. Mark obscured or ambiguous content uncertain. Artwork and medical context require separate context notes; do not infer age, consent or legality."},
+    "sexual_activity": {"input_type": "image", "definition": "Visibly depicted sexual activity, rather than merely suggestive posing or text implying an act. Use uncertain when the image alone is insufficient. Do not infer age, consent or legality."},
+    "suggestive_clothing": {"input_type": "image", "definition": "Visible underwear, swimwear or comparably revealing clothing. This is descriptive, not automatically an unsafe-content decision. Do not infer intent, morality or personal characteristics."},
+    "contextual_sexual_harm": {"input_type": "image", "definition": "Sexual harassment or harmful sexual meaning requiring image text or context, beyond explicit nudity. Record context and uncertainty; a nudity classifier does not establish this label."}
+  },
+  "instructions": "Use only supplied content and context. Keep uncertainty explicit. Human review must be declared honestly; model-assisted labels are not independent human validation. Do not place model scores or previous dataset labels in blinded review inputs. Source grouping and training independence require a separate audit."
+}

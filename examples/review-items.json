@@ -1,0 +1,71 @@
+{
+  "origin": "synthetic",
+  "prior_use": "diagnostic",
+  "source_note": "Self-authored workflow examples. No human ground truth or independent quality evidence is supplied.",
+  "items": [
+    {
+      "id": "example-1",
+      "group": "conversation-1",
+      "input_type": "text",
+      "slice": "en",
+      "text": "Thank you for your help.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-2",
+      "group": "conversation-2",
+      "input_type": "text",
+      "slice": "fr",
+      "text": "Merci pour ton aide.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-3",
+      "group": "conversation-3",
+      "input_type": "text",
+      "slice": "en",
+      "text": "You are useless.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-4",
+      "group": "conversation-4",
+      "input_type": "text",
+      "slice": "fr",
+      "text": "Tu ne sers à rien.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-5",
+      "group": "conversation-5",
+      "input_type": "text",
+      "slice": "en",
+      "text": "I will hurt you.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-6",
+      "group": "conversation-6",
+      "input_type": "text",
+      "slice": "fr",
+      "text": "Je vais te faire du mal.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-7",
+      "group": "conversation-7",
+      "input_type": "text",
+      "slice": "en",
+      "text": "The report describes a threat.",
+      "context": "Synthetic example for demonstrating the review process."
+    },
+    {
+      "id": "example-8",
+      "group": "conversation-8",
+      "input_type": "text",
+      "slice": "fr",
+      "text": "Le rapport décrit une menace.",
+      "context": "Synthetic example for demonstrating the review process."
+    }
+  ]
+}
