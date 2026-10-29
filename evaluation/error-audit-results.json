@@ -1,0 +1,649 @@
+{
+  "sample_rule": "6 per model/source/error stratum, audit-v1 salted ID SHA-256",
+  "inference_tolerance": 1e-06,
+  "scope": "Post-hoc diagnostics, no relabelling, threshold tuning or new acceptance test",
+  "protocol_sha256": "fe6a8b427a05cb97b5ce1c5138cf2d6d5acd3a2b01aa1b45e22248dd2680b46f",
+  "models": {
+    "horizon-small": {
+      "model": {
+        "id": "Horizon-Labs/multilingual-toxicity-small",
+        "revision": "01adcc628a33848569816d4851a38544c321b92c",
+        "label_map": {
+          "toxicity": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "sigmoid",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "native_labels": {
+        "0": "toxicity",
+        "1": "severe_toxicity",
+        "2": "obscene",
+        "3": "threat",
+        "4": "insult",
+        "5": "identity_attack",
+        "6": "sexual_explicit"
+      },
+      "problem_type": "multi_label_classification",
+      "activation_checked": "sigmoid",
+      "sample_replays": [
+        {
+          "id": "toxifrench-9cd876cabca2e5dfe622c6565267473937bb9e58d4a624e6a414ecaaab863e1f",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "a3369f97f621cf1118f84429e859652892fb0738d675b4af8595a7248f381418",
+          "tokens": 38,
+          "recorded_api_score": 0.42008867859840393,
+          "direct_score": 0.42008867859840393,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-d6eeff7899ce98aa5e2aafd1a60d2731ae9ed32e5301e83a47fca84d31501aa8",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "285e242a08cc831ce63897cafb21b5c6fabe3df328b716d9c2f76fa6b5a9f0a5",
+          "tokens": 26,
+          "recorded_api_score": 0.46206849813461304,
+          "direct_score": 0.46206849813461304,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-06e658fc0ceb0b32a31b930eba917a805a4c345dd809d4a5531177e6628ef2ec",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "06340c200304a1fccee61ba2f2166b7eca16f6bb5f4457b7fea7d261a53ec318",
+          "tokens": 16,
+          "recorded_api_score": 0.1953156441450119,
+          "direct_score": 0.1953156441450119,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-79bcf9165101ff949ccc911e1610e3a58d4c29005da009828c47c25c3b35c327",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "01cedaf6f0f6a0bb739a769a77481ec56ea0e09cebc07e89e363a7231af304e9",
+          "tokens": 32,
+          "recorded_api_score": 0.04136613756418228,
+          "direct_score": 0.04136613756418228,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-74b655c2099fdd4aed2d992b5080dc973cefa8b4c0b3069aa6f139a0023e4f22",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "844916dde7acb5ae62324bd2bf96ff36a369ac74c3c7dae7ed3caf461692991a",
+          "tokens": 34,
+          "recorded_api_score": 0.4170409142971039,
+          "direct_score": 0.4170409142971039,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-23267d974a6fc8d472dcc46712746c4e1d389b92bab0232fd5e2815ff1bd8684",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "9133c7df89956ad7f55b62c2eb375082ee8a213a5f613ce5f15b73532e465ee4",
+          "tokens": 15,
+          "recorded_api_score": 0.12494983524084091,
+          "direct_score": 0.12494983524084091,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-da0acb8e5dda6d293f77f4de8fc43832facd78b1114abdbb6b400265f9e00a27",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "4c8fb73113a5b13901f0bec8e58d217764d101343a6324288e19279fdc2dc4d9",
+          "tokens": 20,
+          "recorded_api_score": 0.5436632633209229,
+          "direct_score": 0.5436632633209229,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-e8774131100e2051ea2cd6ade851c96ff22e90347adfda1064dded3d6b7abb47",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "fe599904c17008a62150fe5e13ff19e19ec9c49235b4b78ab5360ab82eb0d21e",
+          "tokens": 27,
+          "recorded_api_score": 0.5279951095581055,
+          "direct_score": 0.5279951095581055,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-9a1f4d7d566ed29b2bd2ed05da8f7e272eeb02b4654a296ab1f7088fcc59e6a9",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "a3252c6478a2ef6daa7b6687fb1e947cfa26528349518e40bb00430b9cc21e00",
+          "tokens": 30,
+          "recorded_api_score": 0.5959236025810242,
+          "direct_score": 0.5959236025810242,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-165226b4f96f2566547631509dc5e9114c11d8479cfb40ad83b26e813dac0fda",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "c97f39a60df31036c4cd8d9a1f2552b7e9667ec34c44413b7f98b67eca5f02fe",
+          "tokens": 22,
+          "recorded_api_score": 0.5272925496101379,
+          "direct_score": 0.5272925496101379,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-13fdc1a56071ccd214204b28ad8227e337802921c80d64311c459ac93c1e179a",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "b0eb685a39b171a7a7453f88ba2c8bd1eb786a34103cd76129b907667e8311dc",
+          "tokens": 10,
+          "recorded_api_score": 0.6791651844978333,
+          "direct_score": 0.6791651844978333,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-ed55f834d8dc9c37fe961387956c6c68f243264db8a39ccfdfd879946650a00b",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "95172af7df1225b410d4608b80277b913db8c53c02452b281b4145e0ecc03f32",
+          "tokens": 30,
+          "recorded_api_score": 0.5573174953460693,
+          "direct_score": 0.5573174953460693,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-a99a15f28e06a29ece1bcbe911110add916652c01c68d221ead1216770ddd90c",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "32f947c34132eb1d5480c76c6b1d4b0f62881da5826927040189f3f26a0196a6",
+          "tokens": 25,
+          "recorded_api_score": 0.39065021276474,
+          "direct_score": 0.39065021276474,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-b1ddec16b9334b8dce7559ff587d4134766cda67c2a84f52d0f07a8d54e1cd27",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "b1ddec16b9334b8dce7559ff587d4134766cda67c2a84f52d0f07a8d54e1cd27",
+          "tokens": 18,
+          "recorded_api_score": 0.45181694626808167,
+          "direct_score": 0.45181694626808167,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-da43a3c7f5da7e3e2ae3b0c4d26c175421e7aebc2a28e2ffbdf7ce8ea6c7d4e8",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "da43a3c7f5da7e3e2ae3b0c4d26c175421e7aebc2a28e2ffbdf7ce8ea6c7d4e8",
+          "tokens": 16,
+          "recorded_api_score": 0.039351243525743484,
+          "direct_score": 0.039351243525743484,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-a7aa8c1d46b595a54e3b9b9071826324038a85f8237ffcab577907349c068bc9",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "a7aa8c1d46b595a54e3b9b9071826324038a85f8237ffcab577907349c068bc9",
+          "tokens": 78,
+          "recorded_api_score": 0.33755970001220703,
+          "direct_score": 0.33755970001220703,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-879cbaf5d719f64a0eb24c8f3d0f2b955e80daaebe0beadbf69b7975dd7acc0b",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "879cbaf5d719f64a0eb24c8f3d0f2b955e80daaebe0beadbf69b7975dd7acc0b",
+          "tokens": 16,
+          "recorded_api_score": 0.41088947653770447,
+          "direct_score": 0.41088947653770447,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-fc6914a0ae1401d6748563aab03289c4ef436f561e53a2c92eeff853f1d3c05e",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "fc6914a0ae1401d6748563aab03289c4ef436f561e53a2c92eeff853f1d3c05e",
+          "tokens": 30,
+          "recorded_api_score": 0.48437994718551636,
+          "direct_score": 0.48437994718551636,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-01a6c49823eb30a9ec939195b91234cb5a51b9e03ad3f3d8b8418736e05ae263",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "01a6c49823eb30a9ec939195b91234cb5a51b9e03ad3f3d8b8418736e05ae263",
+          "tokens": 32,
+          "recorded_api_score": 0.5051479935646057,
+          "direct_score": 0.5051479935646057,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-048e5969ae57c039becfb3e4b41b536b097056f6dafacc1d1ffd875c188d3815",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "048e5969ae57c039becfb3e4b41b536b097056f6dafacc1d1ffd875c188d3815",
+          "tokens": 31,
+          "recorded_api_score": 0.6010904312133789,
+          "direct_score": 0.6010904312133789,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-4b0d1ec262a5081b7d591ea223cecd1cbc36815cacfb805fdb2331792946d5cd",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "4b0d1ec262a5081b7d591ea223cecd1cbc36815cacfb805fdb2331792946d5cd",
+          "tokens": 15,
+          "recorded_api_score": 0.5340594053268433,
+          "direct_score": 0.5340594053268433,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-57ae4ed6b687bbc4c1c28676b846e2a9935cb0934c88bbefb12af62ac6100a55",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "e82f3900fff928b33606337e72a29fb91b7edaf0d16793fee5c221117f24edbc",
+          "tokens": 29,
+          "recorded_api_score": 0.5026727914810181,
+          "direct_score": 0.5026727914810181,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-0c9c0d67e0acb71d143d484dc4117a5f53d48ddc332f368ac231e5640ed83fc9",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "0c9c0d67e0acb71d143d484dc4117a5f53d48ddc332f368ac231e5640ed83fc9",
+          "tokens": 20,
+          "recorded_api_score": 0.5038554668426514,
+          "direct_score": 0.5038554668426514,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-807957d5988db85936d8afe093e712b4faceab2c4c1d058f3aaa560527fc68f8",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "807957d5988db85936d8afe093e712b4faceab2c4c1d058f3aaa560527fc68f8",
+          "tokens": 28,
+          "recorded_api_score": 0.603463351726532,
+          "direct_score": 0.603463351726532,
+          "absolute_difference": 0.0,
+          "matches": true
+        }
+      ],
+      "all_sample_scores_match": true,
+      "ranking_by_source": {
+        "toxifrench": {
+          "cases": 754,
+          "positive_cases": 363,
+          "negative_cases": 391,
+          "true_positive": 154,
+          "false_positive": 33,
+          "recall": 0.42424242424242425,
+          "false_positive_rate": 0.08439897698209718,
+          "roc_auc": 0.8409601713484531
+        },
+        "toxigen": {
+          "cases": 466,
+          "positive_cases": 180,
+          "negative_cases": 286,
+          "true_positive": 44,
+          "false_positive": 24,
+          "recall": 0.24444444444444444,
+          "false_positive_rate": 0.08391608391608392,
+          "roc_auc": 0.7278360528360528
+        }
+      },
+      "toxigen_label_sensitivity": {
+        "recorded_rating_gte_3": {
+          "cases": 466,
+          "positive_cases": 180,
+          "negative_cases": 286,
+          "true_positive": 44,
+          "false_positive": 24,
+          "recall": 0.24444444444444444,
+          "false_positive_rate": 0.08391608391608392,
+          "roc_auc": 0.7278360528360528
+        },
+        "alternative_rating_gt_2_5": {
+          "cases": 466,
+          "positive_cases": 209,
+          "negative_cases": 257,
+          "true_positive": 49,
+          "false_positive": 19,
+          "recall": 0.23444976076555024,
+          "false_positive_rate": 0.07392996108949416,
+          "roc_auc": 0.7359484668516002
+        },
+        "extreme_mean_ratings_lte_2_or_gte_4": {
+          "cases": 372,
+          "positive_cases": 135,
+          "negative_cases": 237,
+          "true_positive": 37,
+          "false_positive": 19,
+          "recall": 0.2740740740740741,
+          "false_positive_rate": 0.08016877637130802,
+          "roc_auc": 0.7757149554617909
+        },
+        "interpretation": "Post-hoc label-mapping sensitivity; extreme means do not prove annotator agreement"
+      },
+      "test_response_sha256": "50d843d7a7b3b1e240bb8b0345ca2740eb6fc9cb688178abab6857ba2bf8ad0e"
+    },
+    "gravitee-distilbert": {
+      "model": {
+        "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
+        "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
+        "label_map": {
+          "toxic": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "softmax",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "native_labels": {
+        "0": "not-toxic",
+        "1": "toxic"
+      },
+      "problem_type": "single_label_classification",
+      "activation_checked": "softmax",
+      "sample_replays": [
+        {
+          "id": "toxifrench-23267d974a6fc8d472dcc46712746c4e1d389b92bab0232fd5e2815ff1bd8684",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "9133c7df89956ad7f55b62c2eb375082ee8a213a5f613ce5f15b73532e465ee4",
+          "tokens": 15,
+          "recorded_api_score": 0.002569089410826564,
+          "direct_score": 0.002569089410826564,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-52e9b00074a432ab3ecf54435e4b4c1f9481a2fcba30c21306c6f2d95b0a42a9",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "9931923f180e6b013c05f62be0697fbd876fd2f79456074dc365c353987824c4",
+          "tokens": 23,
+          "recorded_api_score": 0.1099710464477539,
+          "direct_score": 0.1099710464477539,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-08bf10175427dd2e3739089fcee9bbe2ebe9cd278a364fa2284b126d215f30c5",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "10039f68df053f2f63c4570d087ae76c7eda919faefd581dfbe11ae94f4c99c9",
+          "tokens": 12,
+          "recorded_api_score": 0.001646114862523973,
+          "direct_score": 0.001646114862523973,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-7083f1f750f8c1364b6cb857ee9f7783566d25ef80186c93e088bed88c7954f2",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "dc1fbe79b3ab1603d5a736d02ccf77cdce99504b63c56b153a0234fd9c166f99",
+          "tokens": 32,
+          "recorded_api_score": 0.008646016009151936,
+          "direct_score": 0.008646016009151936,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-2cebd8f56fd9ba23d72890781e038db2ca5eb54d39ff4b891378ef82306f6a02",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "1f96fa3d10333acb2354fb87afba1bd4f86a61f6109711035474a7fbae2d0069",
+          "tokens": 30,
+          "recorded_api_score": 0.001084691844880581,
+          "direct_score": 0.001084691844880581,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-dcd85bda780c1117a9ed249b1f49c4c176728de81462a23c231158f66f3d6235",
+          "stratum": "toxifrench/false_negative",
+          "input_sha256": "014ad3c79ee7d2e473a37c9e65a8af69851bf39ee6c5c742698b3e1a34468f4d",
+          "tokens": 16,
+          "recorded_api_score": 0.007671107538044453,
+          "direct_score": 0.007671107538044453,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-6410c07e55014f80b0e2f0a6c126de45963262d98817342da0e901b6e137c399",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "01ba5ade2155fa595e593e669da8bf42421de1f153946f25586a13665e7e72f5",
+          "tokens": 24,
+          "recorded_api_score": 0.6994652152061462,
+          "direct_score": 0.6994652152061462,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-5c30c88012b98412a1fcf72dbae81cc0474472ad88edf00e4d097d9c284c2168",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "5c30c88012b98412a1fcf72dbae81cc0474472ad88edf00e4d097d9c284c2168",
+          "tokens": 17,
+          "recorded_api_score": 0.7513504028320312,
+          "direct_score": 0.7513504028320312,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-9faf5094b8bf6c4e9c3a316fa6ae4a5e2d8e8e509d4604e8278c1bf843abeecb",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "7d023dea6988f4edda72ce0d17b2bc029ef8385ace54e763795cb42313c871f8",
+          "tokens": 11,
+          "recorded_api_score": 0.5281355381011963,
+          "direct_score": 0.5281355381011963,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-43351dfce5bcfe0973b863db8c6e84acd01d0fd73afbc918a13905a38d3d4ad9",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "43165b433dd0b510d8cc6e847ba0ce7d233b59bd8f6a8330aa096d694eee9169",
+          "tokens": 39,
+          "recorded_api_score": 0.9876292943954468,
+          "direct_score": 0.9876292943954468,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-7463af214f7956859cd3d1d376109db932c41a34148a6cbed88edb4f3509b2ff",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "be058411151e9040d66a4523a8b6af09ce8fd3db6dc7f27f3d0e54111e2a33f7",
+          "tokens": 10,
+          "recorded_api_score": 0.8036887049674988,
+          "direct_score": 0.8036887049674988,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxifrench-b4a07390dc1c3e92ef45654179687e0a83f0e73630b5ab9daf23c9761d2979e3",
+          "stratum": "toxifrench/false_positive",
+          "input_sha256": "6a6aaf5a742aff81858ebbf88bd390cee1bb9c6f289c54ac36625c62603fb397",
+          "tokens": 14,
+          "recorded_api_score": 0.9327589273452759,
+          "direct_score": 0.9327589273452759,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-b1ddec16b9334b8dce7559ff587d4134766cda67c2a84f52d0f07a8d54e1cd27",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "b1ddec16b9334b8dce7559ff587d4134766cda67c2a84f52d0f07a8d54e1cd27",
+          "tokens": 18,
+          "recorded_api_score": 0.45498916506767273,
+          "direct_score": 0.45498916506767273,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-da43a3c7f5da7e3e2ae3b0c4d26c175421e7aebc2a28e2ffbdf7ce8ea6c7d4e8",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "da43a3c7f5da7e3e2ae3b0c4d26c175421e7aebc2a28e2ffbdf7ce8ea6c7d4e8",
+          "tokens": 16,
+          "recorded_api_score": 0.017326826229691505,
+          "direct_score": 0.017326826229691505,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-a7aa8c1d46b595a54e3b9b9071826324038a85f8237ffcab577907349c068bc9",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "a7aa8c1d46b595a54e3b9b9071826324038a85f8237ffcab577907349c068bc9",
+          "tokens": 87,
+          "recorded_api_score": 0.02435370534658432,
+          "direct_score": 0.02435370534658432,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-2dab6029b4f30f2da164a7097eb4959069fb77c68dbf8abb596862a49ef2d1b2",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "2dab6029b4f30f2da164a7097eb4959069fb77c68dbf8abb596862a49ef2d1b2",
+          "tokens": 14,
+          "recorded_api_score": 0.006520614493638277,
+          "direct_score": 0.006520614493638277,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-879cbaf5d719f64a0eb24c8f3d0f2b955e80daaebe0beadbf69b7975dd7acc0b",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "879cbaf5d719f64a0eb24c8f3d0f2b955e80daaebe0beadbf69b7975dd7acc0b",
+          "tokens": 17,
+          "recorded_api_score": 0.020693082362413406,
+          "direct_score": 0.020693082362413406,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-fc6914a0ae1401d6748563aab03289c4ef436f561e53a2c92eeff853f1d3c05e",
+          "stratum": "toxigen/false_negative",
+          "input_sha256": "fc6914a0ae1401d6748563aab03289c4ef436f561e53a2c92eeff853f1d3c05e",
+          "tokens": 32,
+          "recorded_api_score": 0.007855618372559547,
+          "direct_score": 0.007855618372559547,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-19e1da9e7e7b4fdd13883c7d84f6acd69e849e5f67345567e1e62d262a176d05",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "8b1e29538332cef4d696ba63fb40c1a3646bbe986e1857fc858f1a274a5a6679",
+          "tokens": 14,
+          "recorded_api_score": 0.6189187169075012,
+          "direct_score": 0.6189187169075012,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-27b625cb3ecbad5ad63e4944e12a13e933b89e140d60549b4c845d2243e2c729",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "27b625cb3ecbad5ad63e4944e12a13e933b89e140d60549b4c845d2243e2c729",
+          "tokens": 9,
+          "recorded_api_score": 0.7443844676017761,
+          "direct_score": 0.7443844676017761,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-3fd5de82276d672144e51b33f4092f2ccc834cbecc6ff8291953762e31209b28",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "3fd5de82276d672144e51b33f4092f2ccc834cbecc6ff8291953762e31209b28",
+          "tokens": 34,
+          "recorded_api_score": 0.5558390021324158,
+          "direct_score": 0.5558390021324158,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-57ae4ed6b687bbc4c1c28676b846e2a9935cb0934c88bbefb12af62ac6100a55",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "e82f3900fff928b33606337e72a29fb91b7edaf0d16793fee5c221117f24edbc",
+          "tokens": 34,
+          "recorded_api_score": 0.9403305649757385,
+          "direct_score": 0.9403305649757385,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-95dcb28e5665183128e56808ea24260cc9e7f1d6817e3870c62085acd5ea1850",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "a95bfbef7c696c28c0c9e5fedf6703b94ac200f775dbb52a4ecf4802f8db4dfe",
+          "tokens": 30,
+          "recorded_api_score": 0.9538128972053528,
+          "direct_score": 0.9538128972053528,
+          "absolute_difference": 0.0,
+          "matches": true
+        },
+        {
+          "id": "toxigen-717950b837a80f230c54c6d50e09111eb16823b926c01194c35ff3fb34a4a8ba",
+          "stratum": "toxigen/false_positive",
+          "input_sha256": "717950b837a80f230c54c6d50e09111eb16823b926c01194c35ff3fb34a4a8ba",
+          "tokens": 14,
+          "recorded_api_score": 0.994212806224823,
+          "direct_score": 0.994212806224823,
+          "absolute_difference": 0.0,
+          "matches": true
+        }
+      ],
+      "all_sample_scores_match": true,
+      "ranking_by_source": {
+        "toxifrench": {
+          "cases": 754,
+          "positive_cases": 363,
+          "negative_cases": 391,
+          "true_positive": 246,
+          "false_positive": 112,
+          "recall": 0.6776859504132231,
+          "false_positive_rate": 0.2864450127877238,
+          "roc_auc": 0.7639590511015761
+        },
+        "toxigen": {
+          "cases": 466,
+          "positive_cases": 180,
+          "negative_cases": 286,
+          "true_positive": 60,
+          "false_positive": 37,
+          "recall": 0.3333333333333333,
+          "false_positive_rate": 0.12937062937062938,
+          "roc_auc": 0.6979603729603729
+        }
+      },
+      "toxigen_label_sensitivity": {
+        "recorded_rating_gte_3": {
+          "cases": 466,
+          "positive_cases": 180,
+          "negative_cases": 286,
+          "true_positive": 60,
+          "false_positive": 37,
+          "recall": 0.3333333333333333,
+          "false_positive_rate": 0.12937062937062938,
+          "roc_auc": 0.6979603729603729
+        },
+        "alternative_rating_gt_2_5": {
+          "cases": 466,
+          "positive_cases": 209,
+          "negative_cases": 257,
+          "true_positive": 67,
+          "false_positive": 30,
+          "recall": 0.32057416267942584,
+          "false_positive_rate": 0.11673151750972763,
+          "roc_auc": 0.7047455923147097
+        },
+        "extreme_mean_ratings_lte_2_or_gte_4": {
+          "cases": 372,
+          "positive_cases": 135,
+          "negative_cases": 237,
+          "true_positive": 45,
+          "false_positive": 25,
+          "recall": 0.3333333333333333,
+          "false_positive_rate": 0.10548523206751055,
+          "roc_auc": 0.7427097984060009
+        },
+        "interpretation": "Post-hoc label-mapping sensitivity; extreme means do not prove annotator agreement"
+      },
+      "test_response_sha256": "5081deb5682c1c6460d8e02595a5c91cd31f260f637ea1c252bd0908f3901705"
+    }
+  }
+}

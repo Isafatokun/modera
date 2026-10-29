@@ -61,3 +61,6 @@ Do not tune thresholds on this test and reuse it as independent validation.
 Use [policy calibration](calibration.md) to propose a review cutoff from your own
 labelled validation responses, then assess the frozen proposal on the reserved
 held-out set without retuning.
+
+For external French/English sources, exploratory held-out review gates and a
+separate image coverage challenge, see [external-source evaluation](external.md).

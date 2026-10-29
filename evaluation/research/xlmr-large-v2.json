@@ -1,0 +1,9 @@
+{
+  "id": "textdetox/xlmr-large-toxicity-classifier-v2",
+  "revision": "38ab1b77bd3ff7779777cfa5cda203d9912b14b9",
+  "activation": "softmax",
+  "max_tokens": 256,
+  "label_map": {
+    "toxic": "toxicity"
+  }
+}
