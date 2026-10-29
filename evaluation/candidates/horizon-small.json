@@ -1,0 +1,9 @@
+{
+  "id": "Horizon-Labs/multilingual-toxicity-small",
+  "revision": "01adcc628a33848569816d4851a38544c321b92c",
+  "activation": "sigmoid",
+  "max_tokens": 256,
+  "label_map": {
+    "toxicity": "toxicity"
+  }
+}

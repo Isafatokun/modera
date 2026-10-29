@@ -1,0 +1,235 @@
+{
+  "date": "2026-10-28",
+  "provenance": "Counts recovered from the completed local run recorded in the conversation; original prediction files were removed by workspace maintenance. Fresh workflow artifacts provide new raw evidence.",
+  "cases": 1500,
+  "per_language_per_label": 50,
+  "threshold": 0.5,
+  "sample_sha256": "3b9a4ccd7be4da377e0da08b3d312a0cf4c68828c10e4c2401d62759545d5ef8",
+  "dataset_revision": "bc570f7558ab8cbd8d0d9a550c7406e8343fad90",
+  "exclusions": {
+    "training_overlap_groups": 232,
+    "conflicting_label_groups": 1,
+    "duplicate_test_rows": 15
+  },
+  "columns": [
+    "toxic_escalated",
+    "non_toxic_escalated",
+    "toxic_allowed",
+    "non_toxic_allowed",
+    "failed"
+  ],
+  "horizon": {
+    "am": [
+      3,
+      6,
+      47,
+      44,
+      0
+    ],
+    "ar": [
+      28,
+      6,
+      22,
+      44,
+      0
+    ],
+    "de": [
+      13,
+      0,
+      37,
+      50,
+      0
+    ],
+    "en": [
+      46,
+      1,
+      4,
+      49,
+      0
+    ],
+    "es": [
+      22,
+      2,
+      28,
+      48,
+      0
+    ],
+    "fr": [
+      44,
+      2,
+      6,
+      48,
+      0
+    ],
+    "he": [
+      24,
+      4,
+      26,
+      44,
+      2
+    ],
+    "hi": [
+      10,
+      0,
+      40,
+      50,
+      0
+    ],
+    "hin": [
+      8,
+      3,
+      42,
+      47,
+      0
+    ],
+    "it": [
+      36,
+      6,
+      13,
+      44,
+      1
+    ],
+    "ja": [
+      9,
+      0,
+      41,
+      50,
+      0
+    ],
+    "ru": [
+      31,
+      2,
+      19,
+      48,
+      0
+    ],
+    "tt": [
+      26,
+      6,
+      24,
+      44,
+      0
+    ],
+    "uk": [
+      7,
+      1,
+      43,
+      49,
+      0
+    ],
+    "zh": [
+      9,
+      0,
+      41,
+      50,
+      0
+    ]
+  },
+  "gravitee": {
+    "am": [
+      39,
+      34,
+      11,
+      16,
+      0
+    ],
+    "ar": [
+      42,
+      16,
+      8,
+      34,
+      0
+    ],
+    "de": [
+      39,
+      2,
+      11,
+      48,
+      0
+    ],
+    "en": [
+      48,
+      2,
+      2,
+      48,
+      0
+    ],
+    "es": [
+      40,
+      2,
+      10,
+      48,
+      0
+    ],
+    "fr": [
+      47,
+      3,
+      3,
+      47,
+      0
+    ],
+    "he": [
+      29,
+      8,
+      21,
+      40,
+      2
+    ],
+    "hi": [
+      47,
+      2,
+      3,
+      48,
+      0
+    ],
+    "hin": [
+      35,
+      16,
+      15,
+      34,
+      0
+    ],
+    "it": [
+      46,
+      13,
+      3,
+      37,
+      1
+    ],
+    "ja": [
+      44,
+      5,
+      6,
+      45,
+      0
+    ],
+    "ru": [
+      45,
+      0,
+      5,
+      50,
+      0
+    ],
+    "tt": [
+      49,
+      4,
+      1,
+      46,
+      0
+    ],
+    "uk": [
+      45,
+      3,
+      5,
+      47,
+      0
+    ],
+    "zh": [
+      31,
+      8,
+      19,
+      42,
+      0
+    ]
+  }
+}

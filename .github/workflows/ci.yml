@@ -28,12 +28,16 @@ jobs:
       - run: uv sync --locked --group benchmark
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy
+      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy evaluation
       - name: Check benchmark entry points
         run: |
           uv run --locked --group benchmark python benchmarks/run.py --help
           uv run --locked python benchmarks/prepare_models.py --help
           uv run --locked python benchmarks/server.py --help
+          uv run --locked python -m evaluation.compare_text --help
+          uv run --locked python -m evaluation.diagnose --help
+          uv run --locked python -m evaluation.calibrate --help
+          uv run --locked python -m evaluation.assess --help
       - run: uv run --locked pytest
       - run: uv build
 

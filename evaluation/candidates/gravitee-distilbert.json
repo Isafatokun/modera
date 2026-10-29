@@ -1,0 +1,9 @@
+{
+  "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
+  "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
+  "activation": "softmax",
+  "max_tokens": 256,
+  "label_map": {
+    "toxic": "toxicity"
+  }
+}

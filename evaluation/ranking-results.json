@@ -1,0 +1,298 @@
+{
+  "scope": "Diagnostic reuse of the verified benchmark scores; no threshold fitting or new independent validation.",
+  "baseline_run": "https://github.com/Isafatokun/modera/actions/runs/40762448617",
+  "models": {
+    "horizon-small": {
+      "scope": "Ranking diagnostic on existing scores; no cutoff is selected.",
+      "macro_language_roc_auc_completed": 0.835139433106576,
+      "undefined_languages": [],
+      "languages": {
+        "am": {
+          "roc_auc_completed": 0.5844,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "ar": {
+          "roc_auc_completed": 0.7796,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "de": {
+          "roc_auc_completed": 0.8612,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "en": {
+          "roc_auc_completed": 0.9904,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "es": {
+          "roc_auc_completed": 0.8812,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "fr": {
+          "roc_auc_completed": 0.992,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "he": {
+          "roc_auc_completed": 0.7570833333333333,
+          "toxic_completed": 50,
+          "non_toxic_completed": 48,
+          "toxic_failed": 0,
+          "non_toxic_failed": 2,
+          "errors": {
+            "input_too_long": 2
+          }
+        },
+        "hi": {
+          "roc_auc_completed": 0.9104,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "hin": {
+          "roc_auc_completed": 0.7144,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "it": {
+          "roc_auc_completed": 0.8604081632653061,
+          "toxic_completed": 49,
+          "non_toxic_completed": 50,
+          "toxic_failed": 1,
+          "non_toxic_failed": 0,
+          "errors": {
+            "input_too_long": 1
+          }
+        },
+        "ja": {
+          "roc_auc_completed": 0.8324,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "ru": {
+          "roc_auc_completed": 0.9724,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "tt": {
+          "roc_auc_completed": 0.8252,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "uk": {
+          "roc_auc_completed": 0.7872,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "zh": {
+          "roc_auc_completed": 0.7788,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        }
+      },
+      "limitations": "AUC uses completed cases only; failures are reported separately. Macro AUC is undefined if any language lacks either class. This is not a new validation set, a production threshold recommendation or evidence that scores are calibrated probabilities.",
+      "candidate": {
+        "id": "Horizon-Labs/multilingual-toxicity-small",
+        "revision": "01adcc628a33848569816d4851a38544c321b92c",
+        "label_map": {
+          "toxicity": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "sigmoid",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "cases_sha256": "3b9a4ccd7be4da377e0da08b3d312a0cf4c68828c10e4c2401d62759545d5ef8",
+      "predictions_sha256": "ab30600cd3a06bfcd8714d36c40c7e19d38f7e42186d917219fce7d96ecdeaf2",
+      "analyzer_sha256": "731c9a04ed2586e14b74022f230c0f4931d09fa154d67e336207632417e0446f"
+    },
+    "gravitee-distilbert": {
+      "scope": "Ranking diagnostic on existing scores; no cutoff is selected.",
+      "macro_language_roc_auc_completed": 0.9036231292517006,
+      "undefined_languages": [],
+      "languages": {
+        "am": {
+          "roc_auc_completed": 0.6176,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "ar": {
+          "roc_auc_completed": 0.8548,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "de": {
+          "roc_auc_completed": 0.9628,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "en": {
+          "roc_auc_completed": 0.9924,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "es": {
+          "roc_auc_completed": 0.9344,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "fr": {
+          "roc_auc_completed": 0.9856,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "he": {
+          "roc_auc_completed": 0.795,
+          "toxic_completed": 50,
+          "non_toxic_completed": 48,
+          "toxic_failed": 0,
+          "non_toxic_failed": 2,
+          "errors": {
+            "input_too_long": 2
+          }
+        },
+        "hi": {
+          "roc_auc_completed": 0.9872,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "hin": {
+          "roc_auc_completed": 0.816,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "it": {
+          "roc_auc_completed": 0.9273469387755102,
+          "toxic_completed": 49,
+          "non_toxic_completed": 50,
+          "toxic_failed": 1,
+          "non_toxic_failed": 0,
+          "errors": {
+            "input_too_long": 1
+          }
+        },
+        "ja": {
+          "roc_auc_completed": 0.9468,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "ru": {
+          "roc_auc_completed": 0.9808,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "tt": {
+          "roc_auc_completed": 0.9868,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "uk": {
+          "roc_auc_completed": 0.964,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        },
+        "zh": {
+          "roc_auc_completed": 0.8028,
+          "toxic_completed": 50,
+          "non_toxic_completed": 50,
+          "toxic_failed": 0,
+          "non_toxic_failed": 0,
+          "errors": {}
+        }
+      },
+      "limitations": "AUC uses completed cases only; failures are reported separately. Macro AUC is undefined if any language lacks either class. This is not a new validation set, a production threshold recommendation or evidence that scores are calibrated probabilities.",
+      "candidate": {
+        "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
+        "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
+        "label_map": {
+          "toxic": "toxicity"
+        },
+        "cache_dir": null,
+        "activation": "softmax",
+        "max_tokens": 256,
+        "backend": "transformers_sequence_classification"
+      },
+      "cases_sha256": "3b9a4ccd7be4da377e0da08b3d312a0cf4c68828c10e4c2401d62759545d5ef8",
+      "predictions_sha256": "11d9311d6c1c8e15b5cc7affe365a931fb2f4d9346f9f4f390dba7eca2a8d9b9",
+      "analyzer_sha256": "731c9a04ed2586e14b74022f230c0f4931d09fa154d67e336207632417e0446f"
+    }
+  }
+}
