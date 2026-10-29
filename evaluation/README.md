@@ -64,3 +64,6 @@ held-out set without retuning.
 
 For external French/English sources, exploratory held-out review gates and a
 separate image coverage challenge, see [external-source evaluation](external.md).
+
+Use the [category review workflow](review.md) to collect blinded human annotations,
+adjudicate disagreements and export category-specific calibration manifests.

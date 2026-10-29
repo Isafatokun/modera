@@ -99,7 +99,18 @@ Optional [capacity benchmarks](benchmarks/README.md) run with real models.
 See [quality evaluation](evaluation/README.md) for reproducible classifier comparisons.
 Dependencies: `pyproject.toml` and `uv.lock`.
 
+## Integrations and review
+
+The [Go client](clients/go/README.md) supports text, image URLs and uploads with
+context deadlines, bounded retries, typed results and explicit fallback provenance.
+It has no third-party dependencies.
+
+The [category review workflow](evaluation/review.md) creates blinded review packets,
+tracks disagreements, preserves uncertainty and exports sealed calibration/test
+labels. Its example inputs are synthetic; it does not supply independent human
+validation or select a production model automatically.
+
 ## Roadmap
 
-Additional inference adapters, a client SDK with bounded retries,
+Additional inference adapters, other client SDKs,
 and durable asynchronous moderation jobs.
