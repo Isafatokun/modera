@@ -9,7 +9,7 @@ These external sources expose substantially different operating characteristics.
 
 ## Text: untouched test cases at the existing 0.5 review cutoff
 
-| Candidate | Source | Toxic caught | Benign escalated | Failed |
+| Candidate | Source | Toxic caught | Dataset-negative escalated | Failed |
 | --- | --- | ---: | ---: | ---: |
 | Horizon Small | ToxiFrench (French) | 154/363 (42.4%) | 33/391 (8.4%) | 0 |
 | Gravitee DistilBERT | ToxiFrench (French) | 246/363 (67.8%) | 112/391 (28.6%) | 0 |
@@ -94,3 +94,7 @@ verification. ToxiGen uses generated English text with human ratings. Hash-based
 exact deduplication cannot establish source-family, thread, author, paraphrase,
 translation or pretraining independence. Passing this exploratory gate would
 still not establish production performance. No model or policy defaults changed.
+
+A subsequent [error audit](error-audit.md) reproduces 48 sampled scores and flags
+annotation/definition disagreements. Dataset-negative examples are not all
+independently verified benign. Original labels and counts remain unchanged.
