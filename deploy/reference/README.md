@@ -14,6 +14,19 @@ that volume read-only and waits for model readiness. The first run downloads abo
 0.6 GiB of weights. Rerun after an interrupted download; keep the volume to reuse
 cached files. `docker compose down` stops the setup without deleting weights.
 
+For a clean-cache acceptance check with the actual checkpoints:
+
+```sh
+python3 deploy/reference/verify.py --output reference-verification
+```
+
+This builds an isolated Compose project, verifies its model cache is empty, checks
+text/files/live URLs/source failure, restarts and stops the service, and removes
+its test volume. It records hardware, preparation/readiness time and container
+memory snapshots in `result.json`, plus command logs. Memory samples are not peaks;
+these checks do not establish throughput or accuracy. The `Reference profile`
+workflow runs this on a fresh hosted runner and saves the evidence as an artifact.
+
 The API binds to `127.0.0.1:8000`. Set `MODERA_PORT` to choose another port.
 The check submits neutral text and a generated white PNG, verifies authentication,
 model provenance, request IDs and metrics. It does not assess moderation accuracy.
