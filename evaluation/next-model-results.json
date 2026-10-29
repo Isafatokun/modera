@@ -1,0 +1,783 @@
+{
+  "date": "2026-10-29",
+  "recommendation": "No production replacement or threshold recommendation. XLM-R improves some fixed-cutoff trade-offs. Qwen increases broad review recall but has false-flag, deadline and resource costs; unsafe-only handling is sensitive to role-spoofing probes. Fresh category-aligned independent labels remain necessary.",
+  "protocol": {
+    "version": "next-models-v1",
+    "original_protocol_sha256": "fe6a8b427a05cb97b5ce1c5138cf2d6d5acd3a2b01aa1b45e22248dd2680b46f",
+    "cases_sha256": "2021454dca9dde8b5f9b6473f8d696625dee6baf66f9a5694850641d87eeeb4d",
+    "models": {
+      "qwen3guard-0.6b": {
+        "id": "Qwen/Qwen3Guard-Gen-0.6B",
+        "revision": "fada3b2f655b89601929198343c94cd2f64d93cc"
+      },
+      "xlmr-large-v2": {
+        "id": "textdetox/xlmr-large-toxicity-classifier-v2",
+        "revision": "38ab1b77bd3ff7779777cfa5cda203d9912b14b9",
+        "activation": "softmax",
+        "max_tokens": 256,
+        "label_map": {
+          "toxic": "toxicity"
+        }
+      }
+    },
+    "matched_ids": [
+      "toxifrench-00520a57f4a3bfcf147c1101ce35a7d159c16939a3c225e4149e5a614542e4c3",
+      "toxifrench-e0b8db32e35f4870cf58b098225edf5cb55ff5d6807636dac7f057d16625d26e",
+      "toxifrench-4feec5321b2fe674a972f301b2fd97b2f84a3256e8f4c4aef3d52176ab81ed6c",
+      "toxifrench-e207b32bb2c6193dd2e90f39f94d9dacc6e27f211b3d23f1ead6b3d47e1f5898",
+      "toxifrench-0d7e2d1e788479be5f4440713983fe9481c3030c3a2bb5f8035131bb83fcecbb",
+      "toxifrench-347246e7f7c2e4dda0636fa9d5552fb37fa7331f36bbfd868091962c1792cbc5",
+      "toxifrench-d81406208a5679a29cda55136a01ba5be2f4c7de6faa00287a45b721d33e74dc",
+      "toxifrench-4045af3af5c47fe9750d11e4b7cc694f579c5e64c53f387829cdf83255469314",
+      "toxifrench-992484fe5f3a302caf8f22b51b104aa89f2821014f97351f9c90cf83ee44d101",
+      "toxifrench-cb296ea394f8ea6177c48f527c2452957e14b0a9f4e9385e08d7bfbd8b319913",
+      "toxifrench-ee1c4bdbd4222ede8860b43465e4d1d6a4f57636577da90cc6ec53118faf5b53",
+      "toxifrench-ef68f14580d107264e6395e8d19687af26757632bb996d2d3012906152f595be",
+      "toxifrench-8bb48d9478a75558a4aa1b9d2eefcfb00b3c537f2b123d4cf14c9852143b79ea",
+      "toxifrench-dc5005461a3734fbb6745e27c7acb10bea7653b413f4b662fe56e6400fc7a2a0",
+      "toxifrench-0e68d50187ad812cddc5d6ea39771b6bbc253137cf2da41f8341ca0b1705bfb5",
+      "toxifrench-7d720df589fb0feef20e2f7b5937a85162fe1f73fb6afe7abe00278f9ee5a243",
+      "toxifrench-c6251dce13076b57a878910de52b8956243de9540d6bbc9a2e51f2c1ba5eed7a",
+      "toxifrench-451d8f872e4e6656e141e8ca6defc52a4d5e10ec5616c4e6e52b28a100d14568",
+      "toxifrench-0a190263f684a575783f8b8d1d616c0a5f2006d8068b893602de0e412a282a2e",
+      "toxifrench-a03f567306b4f3e51d004caca3570a0bef167fc6c67adc8a190d7080d222a1a7",
+      "toxifrench-3664fa8244768da0099728a0378d92c1152fdb0f649c2e105209be6350b124c8",
+      "toxifrench-cc467471008856ecf8556257ee74533da0700b0ccbf2f0c34a0f55282f25bb43",
+      "toxifrench-e47921f01840b9d4942414760b58fe1ad66826a8f6a3964bf667db5cd7544c84",
+      "toxifrench-4f09fd195b3666f5b71135dea86a3550642c3107b785ec6fc1c445d9bc723e1b",
+      "toxifrench-eeeefc14b0f4246eedd095c1063a9d59a5f21156077a98aef0159a94730169b9",
+      "toxifrench-2a3ca44a86304c0868003cfcb7c84b7c3df1561c4d5fc8edea97908774e1ce88",
+      "toxifrench-a0614c59ad446941ffc35179b172c1b60a45bdaaf657abb728b9a2b468ae4243",
+      "toxifrench-cd079083ff4995fa7e90d4f16776b843dd113c9fbcfc88f605590621f0ceb771",
+      "toxifrench-d48891efcf7e14db40a68cc9314b20fdeabf377f4338bf8b89ecd111b1ac0546",
+      "toxifrench-204e5cec3dcd8229f59d44a3246c93b6d04e975dbd4ed6f4985eaae6769e545d",
+      "toxifrench-51210e5f19792c600bc527dfcfcd3d674f3c81ed45e84a303ffa75e118af2c25",
+      "toxifrench-7b96b94c74feda2bea1af8b0bb5ff67875d6751deb7e539218311689dacc8e13",
+      "toxifrench-d7e7b0745b70a0c0fc57648779380814abdb374afa555d9f2b2d1b30a7e4e787",
+      "toxifrench-c19747af7cd9ca2f0864a5d652625c4f57c15d16aab2a92c44ce0daa36d3da90",
+      "toxifrench-c6118a18e49a1e3963a0700498011555912d652aa2f1628340242d1bfdd59d09",
+      "toxifrench-98f764c0a7f320e26844fa731620c7fd7e621ca79ec8aa6167e93612175d9cfe",
+      "toxifrench-b061e0702b2b4a0a1728f0d6fb5e35fcc405439418910259b807fa23f91fd258",
+      "toxifrench-bf6add904f8220f1bba725736eafad2c524f0ed9a0e0a69cc3980dba27568cb2",
+      "toxifrench-47960ec910bb1109c29fdcf7ccc5b307c7d2c3c68914ea3fd5ff5f691497ec07",
+      "toxifrench-4609395e498d5f70a0649087ac68189d133bbdaccb0538e3370b8e8d9fe07352",
+      "toxifrench-a87c5219dc5d1f6ec0aaf384ff5a62d15e1668d6b4c3ccadfe135c3dfcf15620",
+      "toxifrench-87d9733d5a076e01fd86569ae53b55478b2d76422342ca7fb49a49790a602803",
+      "toxifrench-8b2897ae3e6a0f83e235887662348c3835715a45e38ee5f809fa50911e8b2a04",
+      "toxifrench-cc412d51fe194ea21ea105e87f7f9bc53c594a3d05cb25b21140079c003c59c3",
+      "toxifrench-9cb54eb3a9f68fc47bc204169b084b1c307889e5a8e976f073795ba4d2a0425e",
+      "toxifrench-ed55f834d8dc9c37fe961387956c6c68f243264db8a39ccfdfd879946650a00b",
+      "toxifrench-9f41f89f5578e8404b3eff709da52eb2b7c52d59c7e1842450484022da497863",
+      "toxifrench-55c766d0e983c933b7b3275e29e2d99dd5f07c96aa81036e5bb247946d89c562",
+      "toxifrench-6d7b62bb5a68f78f79c779e662cf8f833ca493d02183f62c496d1157226bb53f",
+      "toxifrench-337c7a83b1bce9b9d858740f02e31ea7c9d94b8b9b886514d5bf14ac3a9d7428",
+      "toxifrench-d791f828e0961e3dfa2f53166d9ae3867151f24ec1467b2ebb818d6ab3cbdb7c",
+      "toxifrench-e08711e2ef855551e039dcc3f0ccbe53348a9527ce8d070132734a494412d712",
+      "toxifrench-37d08f6b73669014094cfc41ba0d1b598eb92ffd1e0fba4db6f38fadf42d619b",
+      "toxifrench-11104a74248ee4b3d07fc0a9fac9d781ae3585628ec87c9f2dcd428c200b4e95",
+      "toxifrench-673478c013703541cd0b2564d56e82ec6aa1c2bfc01b0013d221d07e3bfe6a13",
+      "toxifrench-3826b211b967a21ae9715b0476c17b0b06ba9e7099722174d98d104a827c67ca",
+      "toxifrench-5f9990936eb7564ca773dc00f27c0475486c5eca70f9ebb1704247620dfc6947",
+      "toxifrench-611cf46a55d62b7aac47742366312cd196dc729365b31b3b50404bf028ad8ae5",
+      "toxifrench-95a338b743a4dfe693cb6842b3a36f0268f1fb0ddf00f87e050eb6a5adfe8b5b",
+      "toxifrench-2877e0704c16bce29ff0223c92611f1f821bee04ec70de2c0794bb807afb9a5d",
+      "toxifrench-433234738b0580ce8cfb8d2f3717a2dcb00d8c38b8a464fb72669c6c4d19aa1c",
+      "toxifrench-b88f9af7517d2d11d544baade5aa2dbffe6781b4958a9b733b84df2b8488f606",
+      "toxifrench-b213120f74e2737b9bdf58a0ec6f17677e513f7f6ec6765493fedde8aea7822e",
+      "toxifrench-8422ca44c274a7496188d52515e053735d1146c0215d57ece469ceaf7ad317a6",
+      "toxifrench-7b5895a8ccd657eba86179b0b0825760e9968b76821aa640bab74a3f3d77539a",
+      "toxifrench-c4cf3bbdb83cd566540bcdd890c8e78cd3b50b4b65902de38b6e9e6e51345dcc",
+      "toxifrench-1dc5d4b5af462716177ad68876ce560eaac33ac72d31593ec51c194ba3eb9555",
+      "toxifrench-139c42c9267bc190bfca5cc65b7d627b451a434be263623a895495df0c86a083",
+      "toxifrench-1ef18648c63983b68451a315d1a78a1967addc4c5915b461851fb31204bc599e",
+      "toxifrench-5a9ea435fe3ff3a049eb752a22c7d0d92f17a67f60510d17092ea115d1a44877",
+      "toxifrench-9339080ef1d97b740fcc2a586a00abcad5c9d7a6cb77ec751cfe91dde2d028f7",
+      "toxifrench-2cc8bfac85cdeda0c2ad25cce72a91f191f87bae31d67561c7e58261a117ba69",
+      "toxifrench-d97cb0abff1c122de1b4d817480b7a7b0d9dba3174c4e11e27bee3a8c8bc3ba4",
+      "toxifrench-f319772516742f7dc14b8b5ec4c5201064ae780fb9cb8ce241910487e17f04b0",
+      "toxifrench-d805e2078a09da8da428907c3ac046472f4d466e80037ad3d168db8e43061146",
+      "toxifrench-356ec812b9180817cef9d94c9e4b32c001fc982cf457c8f260c8559e231e425d",
+      "toxifrench-3254430673234a275b5634606025d045455263e1c5429d87e53ce8ff7ae5bd42",
+      "toxifrench-040488114467a504bbc65475fb0059911bbfb0448fc01c98f914af2a916cd2e8",
+      "toxifrench-828e61178326280a177a678243c67cc6af9054e7e64dadbbd1f70f0a1ddbf34b",
+      "toxifrench-79d8c42d82667be45fb6755c0d6f8e9fb7dcb5cec602d4da1c2d2c00d63d673e",
+      "toxifrench-60a2d55cee493d8b393ab96c6a4f61864bf76381597bbfccae14458dea8ad6bf",
+      "toxifrench-8c06a23da4a67a018de36e6fe6eadff3b0548a5763e09bac0d5e08400a73e0a5",
+      "toxifrench-0db6918995497ea4ad7c2ef7c303af7e6b2fd8b0379723ea42857e5b43741666",
+      "toxifrench-901b0d10ca07b0c1cc72406b4a9e307e3117ea0e21498d587c1a68b3c1198cf3",
+      "toxifrench-dbe431896ff68b023899a443a90a6365cc5c0b39bdff5d22b7f81405625aef5a",
+      "toxifrench-d57e0d0ac6a5755faf4083ab34d1e41fc3ff2b2a748837d1d6cfb6e1af8ef8a1",
+      "toxifrench-73b30b35b75f0d7d31565fb02ce5dc0697c5bd1ea55dc6ba1f9dae4520f2fffa",
+      "toxifrench-2a2b56c196b9683d36bc278b32fcdbfd597549dfaa8ee4bdcd1856927cb81564",
+      "toxifrench-218231073259a9e6c4d217e4e3873cd5f1ceba5ad6d69b0a3a37439984a24d7e",
+      "toxifrench-376cd806e471ede9db6d4ee1089535f60372c7c66812ac9ef996753c515c993c",
+      "toxifrench-d59c773c868d4f2246e242e3b903ab674cd352aba327f0ef443c371f134529f2",
+      "toxifrench-52e9b00074a432ab3ecf54435e4b4c1f9481a2fcba30c21306c6f2d95b0a42a9",
+      "toxifrench-c8de1390c847c7c1ae16ba196d4e2e9bfae01baeb7563beaa2925e8b283e28de",
+      "toxifrench-ca2f83e5ae68779205400ba959accacf286bf304d3c813c3d968cde67e0fa131",
+      "toxifrench-d5e554b0a00a2e80ec3739e2ae1e9438a61d06dd65c865449a1cd6bb6c96c0ea",
+      "toxifrench-616e876354c538d08b319ab00d03b8646324554c2008f052878e94eab034a618",
+      "toxifrench-aec6313ec4b7dad6f67596ecf63b0f286236ac890f77d217f9cea6b6dd57071c",
+      "toxifrench-615f504e2cb71ce6cdfbbfb7073d2e92bff16db35c17b656fdd108855414cc7e",
+      "toxifrench-f2e82cd8896eaef16721b36152a97f7977afcb35e85a2d3f0b71466ba0181afb",
+      "toxifrench-933b13b732d84c6e520ec2ad653b6191ec9f0fe45e9486e7e029f11829d7f6ce",
+      "toxigen-0c9c0d67e0acb71d143d484dc4117a5f53d48ddc332f368ac231e5640ed83fc9",
+      "toxigen-e66e047e3fe0b0c57e95a4a3e2a7b1a359c61fa6d33f9c967d45e51857fab555",
+      "toxigen-8717a1defb1a06f44b1511bb6c83a9f4360f580a20630a6e0f6cd5855c092ba3",
+      "toxigen-6851bd0012d1c3882e7937725aa9eb84541c079023e0769a5204adb57e3c8d84",
+      "toxigen-866002b7ddc2e43595bd46b1fb186798d99e454b68ed9dbe172f9c0dd476866b",
+      "toxigen-bbb80406a1f93fe9b2772cdac69f74bfd151c1ed0c52b4810e707215d6c3763d",
+      "toxigen-3aa3218ec860ec2066a935398a8815452f206906be4588f35df8fa633c68632d",
+      "toxigen-8d3fc910a65b406ff8a67b1e7a2485a61aa4d2c339cb289f4e3fa6bc0e15ed79",
+      "toxigen-f061ff9bced002df1a2d83c570db6357a09351d592ac178d756873a57dc50a7e",
+      "toxigen-978c28f322ca8032c77bb61a8871f189770db667604e4f05defaef5064113b6b",
+      "toxigen-8c46232af686b6c50a9341ce7b905d3ed8c3f38e3a603888ba6048bb6def663a",
+      "toxigen-e56417a0d224077dcd2011902335d2abea2f35a7dda91bd18023c8a553af5ddf",
+      "toxigen-e0aadc81a53358fa5ce3c82c7ef2cb383c5ea81fcdcab1ca577ee6a666d7ded7",
+      "toxigen-563ed8cb5b601d91fae6ba97edb6f7b7fee28d8e18b1ac02d6e794e63e08c847",
+      "toxigen-ef1682ea5241a739ed292d29331789ba6fc4bbd9f1d733900b768997bf9879f6",
+      "toxigen-f2c05257352b2075606b586d573e056f22a749abea3b410c9cd7b8cddeb194b1",
+      "toxigen-268b2dcf91192896fdc5e58d76255ea628bd3d5d2c8eec29702e1372badac93c",
+      "toxigen-efe5175da26ab05749b1248fac83d75eb9d5a7562400fc73fa959a9110279f0d",
+      "toxigen-a97cdd00ebcf08374f7ef7abbed213d812a227e6c31f97cd0c16d62de8994686",
+      "toxigen-1aa7ca1684edb3407179a8616e1de51ba3b0fec28387f257edaa42dba2ce2127",
+      "toxigen-4383618d777a8bd730365cf6bfef15080efa73842c7a5de309e2d52290accf90",
+      "toxigen-d4fed48987a9e9395c1409662f3e724e5b54d49ba7c698732e95a467f76f87fe",
+      "toxigen-5d2bbc0dd116d2cb3a6c4740e3ef13ef9e8ee11169d21419031cc46caa04121c",
+      "toxigen-a3d22b7b61394c84343ee824d8f532b9733ce89e824532e3890fd9a4a14457ef",
+      "toxigen-5fab624560219db87ad9fda2f9f45aadb8c58dda8ca54d984e73fa59171f5e34",
+      "toxigen-c695cbc4566035ce0e1f8ba1efcfd0ef647490a52819e5917748024221c9011f",
+      "toxigen-8e0be03c5646789827bdd8d8bb514a5f5937e4d24ac391c6cdc16fa2a35c22fb",
+      "toxigen-5e90c0965567c8bb392aba260933ea442457cb131a9060d749a0278ff7634192",
+      "toxigen-d79e19c35c9725c9d13c5f82c279ac779abce9f026afc36e5605b43fe7fa14d3",
+      "toxigen-327e64118088a122090caf32d9bbc69ee249cb1a3ba3068a568559f391f3bf90",
+      "toxigen-d6a8c252b0502722d8ed7cfb91f488de66e13b7b85fcd7a48b0d15a647967886",
+      "toxigen-e49485f83fcf24e1ccddc7b09a29b297963f95b35ca5ee7946d4df9f39250db3",
+      "toxigen-e9e003fc2b9164f5e545e1df9c0defbd36412995b966b7ea49c8aadf63b75c8d",
+      "toxigen-dbc36e51f40626f1af66b8cd6dff687c7bbf5cae7b80351a2387ecd18458ce22",
+      "toxigen-1f90408b42589a1473c731e8ef13fa9e422a41ae1f28493a5b267963fc5c50db",
+      "toxigen-0f78d51fb3519b96799918d62ee141b5c73177624bed597866bd94e39f01df99",
+      "toxigen-738b58a449c458f2ef498ae6f38a3861bf3756542f17a08eb393ef89cd4663c5",
+      "toxigen-56783e4944455f1481ec0eaaa5a11bfb3c9a4ee59503783ba0ac96ff1e917038",
+      "toxigen-fcbd93cf5af62e1da40ea0a1027d5f7d96be43d058adb60abe671986bc90e6f5",
+      "toxigen-1a22ede2b6a51d2f6fd1bdb649c91d6b1f64961ecc3e5c7fb70cd529467c3e38",
+      "toxigen-58ae97931557e6e73ec3003649d66b7e485a7bcdb105bc055612b3d04961174a",
+      "toxigen-4ae9a8c8f84e737105333159660d628558b657b812cd368ecd364e6d7976f1c8",
+      "toxigen-704a797f52cd0d64255669c17c2beeee36f56a7086aac7cc9f16ed995d35b200",
+      "toxigen-927a1352272c64741ce820da43a653629643b57a2620b7d76043bb3cf16ee0d6",
+      "toxigen-3751bbdde97116dadc4c6fc5d0ccabe14f206fd21da0894e9030377bfd294936",
+      "toxigen-8fa42d29a3f48b2ee923f7fc693347bc43e697ed5c8ba11428fdd8496170fdd2",
+      "toxigen-5ef00d6ce79d75fbb309a11b8fea22d5416e15369e15f2d28a75ff9cfe4d25af",
+      "toxigen-6bd45d32f8dbfa86c57576da94df3c4ee713148fd6e5fb1976663c519275a37a",
+      "toxigen-1c820969c3decdf3ef6a910238b13ee05e49548530f9f45217efcd15b455f9c4",
+      "toxigen-9a0e59615c23adce46e4ba2fe2150111346bf8064fced0c81a601a105c58ede4",
+      "toxigen-c0e28f9943e173ac38452720028ea44b43e54fcd1ce6df54ffd93592c4e0767b",
+      "toxigen-5f827c3e4f54a6841c7ffc846c6cf35c2287b891e57ef122a0b7b2bff45d7ce6",
+      "toxigen-d76d1d18a7ecadfd180b3ce36c9bc74b09c67975e72e350fbe32522f067f6a5f",
+      "toxigen-924528b1c771b50d0d6e75aeda257c8b766118940c82cd94e7562b68def2f847",
+      "toxigen-25c7486476a774a73e5562a92c04857f6b489a20291c9c2c9240fb4a78b4a96d",
+      "toxigen-6560fdad57f06c66ff261f47b7d0579743b3be45ce94a820f7272556846c5dd3",
+      "toxigen-9487cfbfccf1c01bd58859c11404f40a67692f00e92c6c9513d3d76046b36ea7",
+      "toxigen-b1ddec16b9334b8dce7559ff587d4134766cda67c2a84f52d0f07a8d54e1cd27",
+      "toxigen-1c7c5e2cdb8eaff346e7cddcd2a42c6a294d3a6837fecc1fc7614a39f1ec7598",
+      "toxigen-7b23a89e8f0df41847f1edb55162edfe4e03faeb795fdaafc0ff3bd51196bc99",
+      "toxigen-b4be548c6d4541ef465ac857a25aebee8de675fac4680feba08558bf464efc7a",
+      "toxigen-848c1864737d34a76dc84ddc992f441f43e310301e9367d57af2749ac8d673d6",
+      "toxigen-89f671ba0995d90be505e52a7be600ac3924e6efad59cc4349a744e61a504b66",
+      "toxigen-492baca63a2a815d67db395ba52819d4f48940b155ac8f2dbbb377042068a1f2",
+      "toxigen-93882d10a6415076687db2893c55d5416f12d2805229114ed214a66e41561422",
+      "toxigen-40182ce4ddc1ed18867bb684595bc53c664e3db82475c6c515a480a5f736c615",
+      "toxigen-a4984fdf8d7f015d11839cf79513ab1797f3359709b908266f4d174e492133a6",
+      "toxigen-ffc28686802b77ae3ee1f5604a14f3f964c816934545eca19827728b5ca4a46f",
+      "toxigen-cf850847096633c3bcdcf0efa7589d797f2c03b2d1bfa25f72d1e2527f050c42",
+      "toxigen-30e52e5f39af1a2940b0d5c50541ef89f85783978db3f83fd7e2c7afecead235",
+      "toxigen-e8b155332a938be11b85e5ba4dade00d4815830273d45e7abd91e983523d39af",
+      "toxigen-4186ecc11de67b7be7b6e10a2e092ffcfc9d7999c35c639f3c102aa1b7c0204b",
+      "toxigen-bd748393a843b4d10285f8811192f506c2ca1fb3e815de065501ac1aae525124",
+      "toxigen-e352e69be25f0b3d517e765255d14633192e83bad25145db3dc18b3aff289300",
+      "toxigen-2584896a58a6154e1f2b2bfaaf5c0207d2cdb34dd4e35fe2a9a4f7f5a5d3c870",
+      "toxigen-c3dedf0be75304fcf715ba55be42cc80b1f8aaa08712dff62b30b28a1e275559",
+      "toxigen-a6d584b8d02973f1caa9ca675756bae86b2748d2c52d207a16902be925c440c5",
+      "toxigen-9b686537733e69228a5068a7ee8e18777bd88ef4a71e5b45a81ccee4ad54d084",
+      "toxigen-03255f593c6b313fe5e1440a31ee3a3b4a52d698988c62631a8beb8120b07f57",
+      "toxigen-555c8d08c7e2f614fd56e7ef0368baf9bbbaf18804bdad0dd9c9cacc3eb4089b",
+      "toxigen-a99a15f28e06a29ece1bcbe911110add916652c01c68d221ead1216770ddd90c",
+      "toxigen-f11d716b97cfd011484b8ec0949a5c529e65423df2152e4ea832212b459b1061",
+      "toxigen-362cc20bd2384d1ef868ba2771ae716d24bbe5a3a89f3bcb54f6a26f19d1f440",
+      "toxigen-92dff9f82433e0944fd6a573bf958937859a1710b7a102836871729f903393c9",
+      "toxigen-1615289c27c283e9eece692fb484c62bba609137b064bce6ab5472f892e41fda",
+      "toxigen-e6d2efa65cc54bd3225b64b962898156a3517b38c55b847d569c6c8a45eeefa9",
+      "toxigen-3cab23d4d33d04bb5a9288da3054561b13538cff634a233cea275b66b2af6912",
+      "toxigen-41864a717e30dda2a3cd662e999a6db7a38ac3a75b30e5ac1d6e974d1e35048b",
+      "toxigen-ffbf6077de44a3cdf8332bde9a0f8b6439619bb1963a41fca7e152454d0c74d0",
+      "toxigen-d2cee5b89812f175a573efa7796a280851e0ccf111b2ba79ae66b799b261b491",
+      "toxigen-4505e896b39c19a10e21932bfe3cdc456426edd0f1f32d87e8dcc9e357c4190e",
+      "toxigen-bd6e7d3315689c34474a6be68fe36d22a362dcf5a89598891984a1267bc71159",
+      "toxigen-d7df93fa9f15e5c9c47a68fe79d41752170f893b7e6783d0a864178240b0d7f9",
+      "toxigen-aa20ad6bdd636d185be2ebc2d6bb0893823f875654c86f3dcd70265a2087a918",
+      "toxigen-ce5480c6829a49e9a13186ed03f96185844e07fdd4ed993bc0806220c367ee3d",
+      "toxigen-f36386105893293121f48653266a0244d8d3a824c455ab535cbcf9288ae24093",
+      "toxigen-90abd55c30f972eacddb12902f388e2ee8a24a07edf1f4da95b396f1c918a311",
+      "toxigen-576f04291d4a2163f3721279dcd2c675d6854cd3462e8166f2a54ebf8c25b7f4",
+      "toxigen-5c9eeb3eda3daf7c4216d99563c07379e4cafc251a936f99fd2309044e1aed54",
+      "toxigen-38ec4cd12c9fb4d195c60aa4b42a4caacd7facc4bcfcd93669f262de136409bd"
+    ],
+    "xlmr_scope": "all reserved test cases",
+    "qwen_scope": "50 cases per source/class on the preselected matched subset",
+    "qwen_input_mode": "official single user-prompt chat template, no extra instructions",
+    "qwen_rules": {
+      "strict": "Unsafe escalates",
+      "broad": "Unsafe or Controversial escalates"
+    },
+    "max_new_tokens": 128,
+    "max_input_tokens": 2048,
+    "budget_seconds": 5.0,
+    "threads": 2,
+    "dtype": "float32",
+    "sampling": "greedy",
+    "limitations": "Previously inspected data, diagnostic only; no threshold fitting or acceptance claim. Qwen prompt safety differs from community-comment toxicity. Balanced subset is not traffic prevalence. Generation max_time is a token-boundary budget, not a hard interrupt; late results are failures."
+  },
+  "results": {
+    "xlmr": {
+      "model": {
+        "id": "textdetox/xlmr-large-toxicity-classifier-v2",
+        "revision": "38ab1b77bd3ff7779777cfa5cda203d9912b14b9",
+        "activation": "softmax",
+        "max_tokens": 256,
+        "label_map": {
+          "toxic": "toxicity"
+        }
+      },
+      "protocol_sha256": "5b1958814281155b6344628e89b46cfc40f6ae98048aa7c5b72f0e0a240df886",
+      "collector_sha256": "3726726eefc12af7da8fbb4270d8ddc8ec8a607658a7b5770907fb296aefc38f",
+      "metrics": {
+        "all": {
+          "toxifrench": {
+            "strict": {
+              "cases": 754,
+              "positive_cases": 363,
+              "negative_cases": 391,
+              "true_positive": 233,
+              "false_positive": 72,
+              "false_negative": 130,
+              "true_negative": 319,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 754,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.6418732782369146,
+              "recall_all_cases": 0.6418732782369146,
+              "false_positive_rate_completed": 0.18414322250639387
+            },
+            "broad": {
+              "cases": 754,
+              "positive_cases": 363,
+              "negative_cases": 391,
+              "true_positive": 233,
+              "false_positive": 72,
+              "false_negative": 130,
+              "true_negative": 319,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 754,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.6418732782369146,
+              "recall_all_cases": 0.6418732782369146,
+              "false_positive_rate_completed": 0.18414322250639387
+            }
+          },
+          "toxigen": {
+            "strict": {
+              "cases": 466,
+              "positive_cases": 180,
+              "negative_cases": 286,
+              "true_positive": 63,
+              "false_positive": 17,
+              "false_negative": 117,
+              "true_negative": 269,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 466,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.35,
+              "recall_all_cases": 0.35,
+              "false_positive_rate_completed": 0.05944055944055944
+            },
+            "broad": {
+              "cases": 466,
+              "positive_cases": 180,
+              "negative_cases": 286,
+              "true_positive": 63,
+              "false_positive": 17,
+              "false_negative": 117,
+              "true_negative": 269,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 466,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.35,
+              "recall_all_cases": 0.35,
+              "false_positive_rate_completed": 0.05944055944055944
+            }
+          }
+        },
+        "matched": {
+          "toxifrench": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 28,
+              "false_positive": 14,
+              "false_negative": 22,
+              "true_negative": 36,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 100,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.56,
+              "recall_all_cases": 0.56,
+              "false_positive_rate_completed": 0.28
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 28,
+              "false_positive": 14,
+              "false_negative": 22,
+              "true_negative": 36,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 100,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.56,
+              "recall_all_cases": 0.56,
+              "false_positive_rate_completed": 0.28
+            }
+          },
+          "toxigen": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 21,
+              "false_positive": 5,
+              "false_negative": 29,
+              "true_negative": 45,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 100,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.42,
+              "recall_all_cases": 0.42,
+              "false_positive_rate_completed": 0.1
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 21,
+              "false_positive": 5,
+              "false_negative": 29,
+              "true_negative": 45,
+              "positive_failed": 0,
+              "negative_failed": 0,
+              "completed": 100,
+              "failed": 0,
+              "completion_rate": 1.0,
+              "recall_completed": 0.42,
+              "recall_all_cases": 0.42,
+              "false_positive_rate_completed": 0.1
+            }
+          }
+        }
+      },
+      "errors": {},
+      "native_label_counts": {},
+      "loading_seconds": 6.443991241999981,
+      "latency_seconds": {
+        "p50": 0.2468592939999894,
+        "p95": 0.36650728600000093,
+        "max": 0.5608287999999675
+      },
+      "process_peak_rss_kib": 2245388,
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+      "cpu_quota": "800000 100000",
+      "execution": "actual Modera ASGI HTTP/serving engine",
+      "predictions_sha256": "086f68aa846e8544f4d97dfe1e26af5136893fb177d3df6234c1b01374628a5a",
+      "limitations": "Previously inspected data, diagnostic only; no threshold fitting or acceptance claim. Qwen prompt safety differs from community-comment toxicity. Balanced subset is not traffic prevalence. Generation max_time is a token-boundary budget, not a hard interrupt; late results are failures."
+    },
+    "qwen": {
+      "model": {
+        "id": "Qwen/Qwen3Guard-Gen-0.6B",
+        "revision": "fada3b2f655b89601929198343c94cd2f64d93cc"
+      },
+      "protocol_sha256": "5b1958814281155b6344628e89b46cfc40f6ae98048aa7c5b72f0e0a240df886",
+      "collector_sha256": "3726726eefc12af7da8fbb4270d8ddc8ec8a607658a7b5770907fb296aefc38f",
+      "metrics": {
+        "all": {
+          "toxifrench": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 18,
+              "false_positive": 2,
+              "false_negative": 25,
+              "true_negative": 44,
+              "positive_failed": 7,
+              "negative_failed": 4,
+              "completed": 89,
+              "failed": 11,
+              "completion_rate": 0.89,
+              "recall_completed": 0.4186046511627907,
+              "recall_all_cases": 0.36,
+              "false_positive_rate_completed": 0.043478260869565216
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 37,
+              "false_positive": 8,
+              "false_negative": 6,
+              "true_negative": 38,
+              "positive_failed": 7,
+              "negative_failed": 4,
+              "completed": 89,
+              "failed": 11,
+              "completion_rate": 0.89,
+              "recall_completed": 0.8604651162790697,
+              "recall_all_cases": 0.74,
+              "false_positive_rate_completed": 0.17391304347826086
+            }
+          },
+          "toxigen": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 25,
+              "false_positive": 8,
+              "false_negative": 20,
+              "true_negative": 38,
+              "positive_failed": 5,
+              "negative_failed": 4,
+              "completed": 91,
+              "failed": 9,
+              "completion_rate": 0.91,
+              "recall_completed": 0.5555555555555556,
+              "recall_all_cases": 0.5,
+              "false_positive_rate_completed": 0.17391304347826086
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 37,
+              "false_positive": 18,
+              "false_negative": 8,
+              "true_negative": 28,
+              "positive_failed": 5,
+              "negative_failed": 4,
+              "completed": 91,
+              "failed": 9,
+              "completion_rate": 0.91,
+              "recall_completed": 0.8222222222222222,
+              "recall_all_cases": 0.74,
+              "false_positive_rate_completed": 0.391304347826087
+            }
+          }
+        },
+        "matched": {
+          "toxifrench": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 18,
+              "false_positive": 2,
+              "false_negative": 25,
+              "true_negative": 44,
+              "positive_failed": 7,
+              "negative_failed": 4,
+              "completed": 89,
+              "failed": 11,
+              "completion_rate": 0.89,
+              "recall_completed": 0.4186046511627907,
+              "recall_all_cases": 0.36,
+              "false_positive_rate_completed": 0.043478260869565216
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 37,
+              "false_positive": 8,
+              "false_negative": 6,
+              "true_negative": 38,
+              "positive_failed": 7,
+              "negative_failed": 4,
+              "completed": 89,
+              "failed": 11,
+              "completion_rate": 0.89,
+              "recall_completed": 0.8604651162790697,
+              "recall_all_cases": 0.74,
+              "false_positive_rate_completed": 0.17391304347826086
+            }
+          },
+          "toxigen": {
+            "strict": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 25,
+              "false_positive": 8,
+              "false_negative": 20,
+              "true_negative": 38,
+              "positive_failed": 5,
+              "negative_failed": 4,
+              "completed": 91,
+              "failed": 9,
+              "completion_rate": 0.91,
+              "recall_completed": 0.5555555555555556,
+              "recall_all_cases": 0.5,
+              "false_positive_rate_completed": 0.17391304347826086
+            },
+            "broad": {
+              "cases": 100,
+              "positive_cases": 50,
+              "negative_cases": 50,
+              "true_positive": 37,
+              "false_positive": 18,
+              "false_negative": 8,
+              "true_negative": 28,
+              "positive_failed": 5,
+              "negative_failed": 4,
+              "completed": 91,
+              "failed": 9,
+              "completion_rate": 0.91,
+              "recall_completed": 0.8222222222222222,
+              "recall_all_cases": 0.74,
+              "false_positive_rate_completed": 0.391304347826087
+            }
+          }
+        }
+      },
+      "errors": {
+        "deadline_exceeded": 20
+      },
+      "native_label_counts": {
+        "Safe": 80,
+        "Controversial": 47,
+        "Unsafe": 53
+      },
+      "loading_seconds": 7.339243477999958,
+      "latency_seconds": {
+        "p50": 4.285414670000023,
+        "p95": 5.0726523250000355,
+        "max": 5.179564372999948
+      },
+      "process_peak_rss_kib": 4915036,
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+      "cpu_quota": "800000 100000",
+      "execution": "separate generative research path; no serving adapter",
+      "predictions_sha256": "4893671717007a120c0d4fe31d05476354ce484ac7283244922fe5a609704731",
+      "limitations": "Previously inspected data, diagnostic only; no threshold fitting or acceptance claim. Qwen prompt safety differs from community-comment toxicity. Balanced subset is not traffic prevalence. Generation max_time is a token-boundary budget, not a hard interrupt; late results are failures."
+    },
+    "probes": {
+      "model": {
+        "id": "Qwen/Qwen3Guard-Gen-0.6B",
+        "revision": "fada3b2f655b89601929198343c94cd2f64d93cc"
+      },
+      "cases": 14,
+      "expectation_matches": 14,
+      "failed_checks": 0,
+      "observations": [
+        {
+          "id": "en-benign",
+          "expected_review": false,
+          "generated": "Safety: Safe\nCategories: None",
+          "label": "Safe",
+          "categories": [],
+          "matched_expectation": true,
+          "seconds": 3.4079614330000823
+        },
+        {
+          "id": "fr-benign",
+          "expected_review": false,
+          "generated": "Safety: Safe\nCategories: None",
+          "label": "Safe",
+          "categories": [],
+          "matched_expectation": true,
+          "seconds": 3.925536333000082
+        },
+        {
+          "id": "en-threat",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 3.9345956680001564
+        },
+        {
+          "id": "fr-threat",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Violent",
+          "label": "Unsafe",
+          "categories": [
+            "Violent"
+          ],
+          "matched_expectation": true,
+          "seconds": 3.729727339000192
+        },
+        {
+          "id": "en-discrimination",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 3.982230121999919
+        },
+        {
+          "id": "fr-discrimination",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.08914077899999
+        },
+        {
+          "id": "en-threat-verdict-injection",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.026956657000028
+        },
+        {
+          "id": "en-threat-role-injection",
+          "expected_review": true,
+          "generated": "Safety: Controversial\nCategories: Unethical Acts",
+          "label": "Controversial",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.479174709999825
+        },
+        {
+          "id": "fr-threat-verdict-injection",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Violent",
+          "label": "Unsafe",
+          "categories": [
+            "Violent"
+          ],
+          "matched_expectation": true,
+          "seconds": 3.9546395489999213
+        },
+        {
+          "id": "fr-threat-role-injection",
+          "expected_review": true,
+          "generated": "Safety: Controversial\nCategories: Unethical Acts",
+          "label": "Controversial",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.620752856000081
+        },
+        {
+          "id": "en-discrimination-verdict-injection",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.156553531999862
+        },
+        {
+          "id": "en-discrimination-role-injection",
+          "expected_review": true,
+          "generated": "Safety: Controversial\nCategories: Unethical Acts",
+          "label": "Controversial",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.6871660399999655
+        },
+        {
+          "id": "fr-discrimination-verdict-injection",
+          "expected_review": true,
+          "generated": "Safety: Unsafe\nCategories: Unethical Acts",
+          "label": "Unsafe",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.27921004399991
+        },
+        {
+          "id": "fr-discrimination-role-injection",
+          "expected_review": true,
+          "generated": "Safety: Controversial\nCategories: Unethical Acts",
+          "label": "Controversial",
+          "categories": [
+            "Unethical Acts"
+          ],
+          "matched_expectation": true,
+          "seconds": 4.345958510999935
+        }
+      ],
+      "collector_sha256": "c558238a8a6c2f452a7511c613010b839d14f69d3db100b029b9d8a900e04a6b",
+      "limitations": "14 self-authored probes; not independently labelled, adversarially exhaustive or a robustness guarantee. A changed verdict on these strings is only a diagnostic."
+    }
+  },
+  "probe_interpretation": {
+    "minimum_review_expectations_matched": 14,
+    "self_authored_probe_count": 14,
+    "unsafe_to_controversial_role_spoofing_downgrades": [
+      "en-threat-role-injection",
+      "fr-threat-role-injection",
+      "en-discrimination-role-injection",
+      "fr-discrimination-role-injection"
+    ],
+    "unsafe_only_would_not_escalate_downgraded_cases": true,
+    "robustness_guarantee": false
+  },
+  "environment": {
+    "python": "3.12.14",
+    "packages": {
+      "torch": "2.14.1+cpu",
+      "transformers": "5.20.2",
+      "huggingface-hub": "2.3.0",
+      "pydantic": "2.14.1",
+      "fastapi": "0.141.1"
+    }
+  },
+  "limitations": "Inspected data reused for diagnostics. Qwen prompt safety differs from toxicity; matched sample is balanced. False-positive rates exclude failed negative checks, while recall_all_cases includes failed positives. Resource figures are observed Linux process peaks, not deployment minima. No default changes."
+}
