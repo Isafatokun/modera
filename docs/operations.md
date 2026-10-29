@@ -97,5 +97,8 @@ docker build --build-arg INFERENCE=true -t modera:smoke .
 MODERA_TEST_CONTAINER_IMAGE=modera:smoke uv run --locked --extra inference pytest tests/integration/test_container.py -q
 ```
 
-CI runs both checks. Ingress behavior and platform termination still need target
-deployment testing.
+CI runs both checks. The [gateway and lifecycle rehearsal](../deploy/rehearsal/README.md)
+adds the Go SDK, two real-model processes, NGINX removal/reload, overload/retry,
+active-request draining and an enforced final termination deadline. Its workflow
+retains evidence. Ingress behavior and termination still need testing on the
+chosen hosting platform.

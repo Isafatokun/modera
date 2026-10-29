@@ -17,3 +17,5 @@ model-cache/
 evaluation/data/
 evaluation/results/
 reference-verification/
+
+rehearsal-verification/

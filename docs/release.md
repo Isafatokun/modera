@@ -19,6 +19,10 @@ Implemented and tested:
 - A standard-library Go client with typed errors/results, replayable uploads, bounded
   retries, request contexts, redirection protection and live rules-only API checks.
 
+- A reproducible gateway/SDK lifecycle rehearsal with real-model provenance,
+  overload/retry, active-request removal/draining, restart and final-deadline checks.
+  See [rehearsal scope](../deploy/rehearsal/README.md); hosted CI retains evidence.
+
 Before an external release:
 
 - Validate the target deployment, including ingress removal and
