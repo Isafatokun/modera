@@ -16,6 +16,7 @@ import (
 
 type attempt struct {
 	Started    float64 `json:"started"`
+	Received   float64 `json:"received"`
 	Status     int     `json:"status"`
 	Upstream   string  `json:"upstream"`
 	RequestID  string  `json:"request_id"`
@@ -30,6 +31,7 @@ type recorder struct {
 func (r *recorder) RoundTrip(request *http.Request) (*http.Response, error) {
 	event := attempt{Started: time.Since(r.started).Seconds()}
 	response, err := r.transport.RoundTrip(request)
+	event.Received = time.Since(r.started).Seconds()
 	if response != nil {
 		event.Status = response.StatusCode
 		event.Upstream = response.Header.Get("X-Rehearsal-Upstream")

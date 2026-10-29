@@ -398,7 +398,7 @@ class Rehearsal:
             "unexpected SDK recovery",
         )
         require(
-            trace[1]["started"] - trace[0]["started"] >= 1
+            trace[1]["started"] - trace[0]["received"] >= 1
             and trace[0]["request_id"] != trace[1]["request_id"],
             "retry delay/identity mismatch",
         )
