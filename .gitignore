@@ -14,3 +14,4 @@ build/
 !.env.example
 benchmarks/results/
 model-cache/
+reference-verification/
