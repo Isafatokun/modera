@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Iterator
+from secrets import compare_digest
 
 import pytest
 from fastapi.testclient import TestClient
@@ -186,3 +187,71 @@ def test_openapi_documents_bearer_authentication() -> None:
         "description": "Shared service API key",
     }
     assert "security" not in schema["paths"]["/health/live"]["get"]
+
+
+def test_rotation_accepts_overlap_then_rejects_retired_key(
+    auth_headers: dict[str, str], caplog: pytest.LogCaptureFixture
+) -> None:
+    old = auth_headers["Authorization"].removeprefix("Bearer ")
+    new = "new-test-key-for-overlapping-key-rotation"
+    for previous in (SecretStr(old), None):
+        settings = Settings(api_key=SecretStr(new), previous_api_key=previous)
+        assert old not in repr(settings) + settings.model_dump_json()
+        assert new not in repr(settings) + settings.model_dump_json()
+        with TestClient(create_app(settings)) as client:
+            for key, status in ((new, 200), (old, 200 if previous else 401)):
+                response = client.get(
+                    "/metrics", headers={"Authorization": f"Bearer {key}"}
+                )
+                assert response.status_code == status
+                assert key not in response.text + caplog.text
+            assert client.get("/health/live").status_code == 200
+
+
+@pytest.mark.parametrize("key", ["short-private-key", "é" * 32, " " * 32])
+def test_previous_key_has_same_validation_and_redaction(key: str) -> None:
+    with pytest.raises(ValidationError) as failure:
+        Settings(previous_api_key=SecretStr(key))
+    assert key not in str(failure.value)
+
+
+def test_duplicate_rotation_keys_are_rejected(auth_headers: dict[str, str]) -> None:
+    key = auth_headers["Authorization"].removeprefix("Bearer ")
+    with pytest.raises(ValidationError):
+        Settings(previous_api_key=SecretStr(key))
+
+
+def test_rotation_compares_both_keys_even_when_current_matches(
+    monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    from modera import auth
+
+    original = compare_digest
+    comparisons = 0
+
+    def compare(first: bytes, second: bytes) -> bool:
+        nonlocal comparisons
+        comparisons += 1
+        return original(first, second)
+
+    monkeypatch.setattr(auth, "compare_digest", compare)
+    with TestClient(
+        create_app(
+            Settings(
+                previous_api_key=SecretStr("previous-test-key-for-bounded-key-rotation")
+            )
+        )
+    ) as client:
+        assert client.get("/metrics", headers=auth_headers).status_code == 200
+        assert comparisons == 2
+        assert (
+            client.get(
+                "/metrics",
+                headers=[
+                    ("Authorization", auth_headers["Authorization"]),
+                    ("Authorization", auth_headers["Authorization"]),
+                ],
+            ).status_code
+            == 401
+        )
+        assert comparisons == 2

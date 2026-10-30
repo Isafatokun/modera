@@ -115,3 +115,21 @@ adds the Go SDK, two real-model processes, NGINX removal/reload, overload/retry,
 active-request draining and an enforced final termination deadline. Its workflow
 retains evidence. Ingress behavior and termination still need testing on the
 chosen hosting platform.
+
+## Rotate the API key
+
+Keep keys in your secret manager. To rotate without requiring every caller to
+switch at the same instant:
+
+1. Generate a new key. Deploy it as `MODERA_API_KEY`, with the old key as
+   `MODERA_PREVIOUS_API_KEY`. Wait until all instances accept both keys.
+   With the reference Compose setup, export both variables and recreate the service.
+2. Update callers and the metrics scraper to use the new key. Confirm they work.
+3. Remove `MODERA_PREVIOUS_API_KEY` and roll out that change to all instances.
+   Confirm the old key is rejected.
+
+Both keys have the same permissions and the same validation requirements. Keep
+the overlap short; there is no automatic expiry or live reload. Restart instances
+for each configuration change and keep enough healthy capacity during rollout.
+Never retain a compromised key for convenience. Keys are not included in metric
+labels, and the service does not report which key a caller used.

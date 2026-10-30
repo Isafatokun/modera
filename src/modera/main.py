@@ -81,7 +81,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.ready = False
     app.state.request_capacity = RequestCapacity(config.max_in_flight_requests)
     app.state.settings = config
-    app.state.api_key = config.api_key
+    app.state.api_keys = (config.api_key,) + (
+        (config.previous_api_key,) if config.previous_api_key is not None else ()
+    )
     app.state.text_model = config.text_model
     app.state.image_model = config.image_model
     app.state.policies = load_policies(config.policy_file)
