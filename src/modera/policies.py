@@ -6,10 +6,10 @@ from typing import Annotated, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from modera.errors import APIError
+from modera.input_types import IMAGE
+from modera.input_types import InputType as InputType
 from modera.results import Category, Coverage, Decision, Finding, Score, Version
 from modera.schemas import PolicyName
-
-InputType = Literal["text", "image"]
 
 
 class PolicyModel(BaseModel):
@@ -35,22 +35,69 @@ class PolicyRule(PolicyModel):
         return self
 
 
+class ScoreCondition(PolicyModel):
+    category: Category
+    min: Score
+
+
+class ImageComposite(PolicyModel):
+    id: Category
+    all_of: Annotated[tuple[ScoreCondition, ...], Field(max_length=16)] = ()
+    any_of: Annotated[tuple[ScoreCondition, ...], Field(max_length=16)] = ()
+    scope: Literal["image"] = "image"
+    action: Literal["review", "block"]
+
+    @model_validator(mode="after")
+    def validate_conditions(self) -> Self:
+        if bool(self.all_of) == bool(self.any_of):
+            raise ValueError("choose exactly one non-empty all_of or any_of")
+        conditions = self.all_of or self.any_of
+        if len({condition.category for condition in conditions}) != len(conditions):
+            raise ValueError("composite conditions require unique categories")
+        return self
+
+    @property
+    def conditions(self) -> tuple[ScoreCondition, ...]:
+        return self.all_of or self.any_of
+
+
 class Policy(PolicyModel):
     id: PolicyName
     version: Version
     text: tuple[PolicyRule, ...] = ()
     image: tuple[PolicyRule, ...] = ()
+    image_composites: Annotated[tuple[ImageComposite, ...], Field(max_length=32)] = ()
 
     @model_validator(mode="after")
     def validate_rules(self) -> Self:
-        if not self.text and not self.image:
+        if not self.text and not self.image and not self.image_composites:
             raise ValueError("a policy must define text or image rules")
         for rules in (self.text, self.image):
             if len(rules) != len({rule.category for rule in rules}):
                 raise ValueError(
                     "rule categories must be unique within each input type"
                 )
+        if len({rule.id for rule in self.image_composites}) != len(
+            self.image_composites
+        ):
+            raise ValueError("composite IDs must be unique")
         return self
+
+    def categories_for(
+        self, input_type: InputType, *, required_only: bool = False
+    ) -> frozenset[str]:
+        categories = {
+            rule.category
+            for rule in self.rules_for(input_type)
+            if not required_only or rule.required
+        }
+        if input_type == IMAGE:
+            categories.update(
+                condition.category
+                for rule in self.image_composites
+                for condition in rule.conditions
+            )
+        return frozenset(categories)
 
     def rules_for(self, input_type: InputType) -> tuple[PolicyRule, ...]:
         match input_type:
@@ -99,7 +146,7 @@ def resolve_policy(
             "The selected policy is not configured.",
             param="policy",
         )
-    if not policy.rules_for(input_type):
+    if not policy.categories_for(input_type):
         raise APIError(
             400,
             "policy_not_applicable",
@@ -119,7 +166,7 @@ def evaluate_policy(
     if len(scores) != len(findings) or set(scores) != set(coverage.evaluated):
         raise ValueError("findings must match evaluated coverage exactly")
     rules = policy.rules_for(input_type)
-    if not rules:
+    if not policy.categories_for(input_type):
         raise APIError(
             400,
             "policy_not_applicable",
@@ -127,14 +174,12 @@ def evaluate_policy(
             param="policy",
         )
 
-    for rule in rules:
-        if rule.category in scores:
+    required = policy.categories_for(input_type, required_only=True)
+    for category in policy.categories_for(input_type):
+        if category in scores:
             continue
-        if (
-            rule.category in coverage.unsupported
-            or rule.category in coverage.not_applicable
-        ):
-            if rule.required:
+        if category in coverage.unsupported or category in coverage.not_applicable:
+            if category in required:
                 raise APIError(
                     400,
                     "policy_unsupported",
@@ -150,8 +195,15 @@ def evaluate_policy(
             headers={"Retry-After": "2"},
         )
 
+    composites = policy.image_composites if input_type == IMAGE else ()
+    matched = []
+    for composite in composites:
+        conditions = [scores[c.category] >= c.min for c in composite.conditions]
+        fires = all(conditions) if composite.all_of else any(conditions)
+        if fires:
+            matched.append(composite)
     applicable = [rule for rule in rules if rule.category in scores]
-    if not applicable:
+    if not applicable and not composites:
         raise APIError(
             400,
             "policy_not_applicable",
@@ -164,14 +216,28 @@ def evaluate_policy(
         if rule.block_threshold is not None
         and scores[rule.category] >= rule.block_threshold
     ]
-    if blocked:
-        return Decision(action="block", reasons=blocked)
     reviewed = [
         rule.category
         for rule in applicable
         if rule.review_threshold is not None
         and scores[rule.category] >= rule.review_threshold
     ]
-    if reviewed:
-        return Decision(action="review", reasons=reviewed)
+    outcomes: tuple[tuple[Literal["block", "review"], list[str]], ...] = (
+        ("block", blocked),
+        ("review", reviewed),
+    )
+    for action, reasons in outcomes:
+        matches = [rule for rule in matched if rule.action == action]
+        reasons.extend(
+            condition.category
+            for rule in matches
+            for condition in rule.conditions
+            if scores[condition.category] >= condition.min
+        )
+        if reasons:
+            return Decision(
+                action=action,
+                reasons=list(dict.fromkeys(reasons)),
+                matched_rules=[rule.id for rule in matches],
+            )
     return Decision(action="allow", reasons=[])

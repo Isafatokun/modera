@@ -94,7 +94,7 @@ def test_configured_text_and_image_classifiers_return_shared_contract(
     auth_headers: dict[str, str],
     image_bytes: bytes,
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **configuration(tmp_path, model_required=True),
         text_model=TextModelSettings(
@@ -129,7 +129,7 @@ def test_rules_fallback_does_not_satisfy_failed_model_checks(
     required: bool,
     expected: int,
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **configuration(tmp_path, model_required=required),
         text_model=TextModelSettings(
@@ -156,7 +156,7 @@ def test_rules_fallback_does_not_satisfy_failed_model_checks(
 def test_model_failure_has_no_automatic_rules_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **configuration(tmp_path, model_required=True),
         text_model=TextModelSettings(
@@ -180,13 +180,13 @@ def test_startup_failure_requires_explicit_fallback(
     ) -> FakeClassifier:
         raise OSError("private model path")
 
-    monkeypatch.setattr(engine, "Classifier", unavailable)
+    monkeypatch.setattr(engine, "create_adapter", unavailable)
     values = configuration(tmp_path)
     model = TextModelSettings(
         id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
     )
     with (
-        pytest.raises(RuntimeError, match="configured classifier"),
+        pytest.raises(RuntimeError, match="configured model"),
         TestClient(create_app(Settings(**values, text_model=model))),
     ):
         pass
@@ -240,7 +240,7 @@ def test_explicit_degraded_policy_records_the_policy_actually_applied(
         }
     )
     values["policy_file"].write_text(json.dumps(payload))
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **values,
         text_model=TextModelSettings(
@@ -300,7 +300,7 @@ def test_rules_cannot_return_decisions_after_shutdown(
 def test_rules_only_policy_does_not_run_an_unrelated_model(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **configuration(tmp_path),
         text_model=TextModelSettings(
@@ -320,7 +320,7 @@ def test_rules_only_policy_does_not_run_an_unrelated_model(
 def test_accepted_long_model_id_can_be_returned_in_provenance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     name = "example/" + "m" * 140
     settings = Settings(
         **configuration(tmp_path, model_required=True),
@@ -344,7 +344,7 @@ def test_rules_fallback_does_not_hide_invalid_classifier_configuration(
     ) -> FakeClassifier:
         raise ValueError("label mappings do not match the model outputs")
 
-    monkeypatch.setattr(engine, "Classifier", invalid)
+    monkeypatch.setattr(engine, "create_adapter", invalid)
     settings = Settings(
         **configuration(tmp_path),
         text_model=TextModelSettings(
@@ -353,7 +353,7 @@ def test_rules_fallback_does_not_hide_invalid_classifier_configuration(
         text_fallback="rules",
     )
     with (
-        pytest.raises(RuntimeError, match="configured classifier"),
+        pytest.raises(RuntimeError, match="configured model"),
         TestClient(create_app(settings)),
     ):
         pass
@@ -362,7 +362,7 @@ def test_rules_fallback_does_not_hide_invalid_classifier_configuration(
 def test_engine_keeps_an_independent_model_configuration_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     selection = TextModelSettings(
         id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
     )
@@ -381,7 +381,7 @@ def test_engine_keeps_an_independent_model_configuration_snapshot(
 def test_unsupported_policy_is_rejected_before_model_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     paths = configuration(tmp_path, model_required=True)
     data = json.loads(paths["policy_file"].read_text())
     data["policies"][0]["text"].append({"category": "violence", "block_threshold": 0.9})
@@ -408,7 +408,7 @@ def test_internal_model_failure_never_uses_rules_fallback(
     auth_headers: dict[str, str],
     failure: type[Exception],
 ) -> None:
-    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
     settings = Settings(
         **configuration(tmp_path, model_required=True),
         text_model=TextModelSettings(
@@ -441,3 +441,44 @@ def test_internal_model_failure_never_uses_rules_fallback(
         assert "Retry-After" not in response.headers
         assert "decision" not in response.json()
         assert "private input" not in response.text
+
+
+def test_detector_configuration_uses_shared_policy_and_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    auth_headers: dict[str, str],
+    image_bytes: bytes,
+) -> None:
+    from modera.inference import aggregate_detections
+    from modera.model_config import DetectorModelSettings
+
+    class FakeDetector:
+        categories = frozenset({"sexual"})
+
+        def predict(self, content: object) -> list[Finding]:
+            return aggregate_detections(
+                [0.9],
+                [0],
+                [[0.1, 0.1, 0.8, 0.8]],
+                {0: "native"},
+                {"native": "sexual"},
+            )
+
+    monkeypatch.setattr(engine, "create_adapter", lambda *args: FakeDetector())
+    settings = Settings(
+        **configuration(tmp_path),
+        image_model=DetectorModelSettings(
+            id="example/detector",
+            revision=REVISION,
+            label_map={"native": "sexual"},
+        ),
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        response = client.post(
+            "/v1/moderations", files={"file": ("photo.png", image_bytes)}
+        )
+        assert response.status_code == 200
+        result = response.json()
+        assert result["decision"]["action"] == "block"
+        assert result["coverage"]["evaluated"] == ["sexual"]
+        assert result["models"] == [{"id": "example/detector", "revision": REVISION}]

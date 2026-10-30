@@ -1,10 +1,14 @@
 # Models and rules
 
 Modera separates adapters (how a model runs), label mappings (what its outputs mean),
-and policies (which scores trigger decisions). Text/photo classifiers are supported;
-generative guards and object detectors require different adapters. No model is
+and policies (which scores trigger decisions). Classifiers and compatible photo
+detectors are supported through separate adapters; generative guards are not. No model is
 selected automatically. Validate category meanings, language coverage and thresholds
 before changing models.
+
+For CPU ONNX detectors, see [ONNX setup](onnx.md).
+
+For a detector and classifier working together, see [combining models](combining-models.md).
 
 ## Classifiers
 
@@ -44,23 +48,25 @@ do not depend on model inference. Weights load once at startup, on CPU, from the
 local cache only. Loading requires safetensors and disables remote model code.
 Models load and warm on their serving workers before readiness; missing
 weights, incompatible architecture and invalid label mappings normally fail startup.
-Telemetry is disabled before importing inference libraries. Inference uses one slot
-per modality per process; photos have [bounded waiting](operations.md), while text
+Telemetry is disabled before importing inference libraries. Each model has one
+inference slot per process; photos have [bounded waiting](operations.md), while text
 rejects immediately when busy. Text and photos can run concurrently,
 using their existing model instances. Threads default to 2 per model operation;
 the deadline defaults to 5 seconds
 (`MODERA_INFERENCE_THREADS`, `MODERA_INFERENCE_TIMEOUT_SECONDS`). Timed-out native
 work retains its modality's slot until completion. Busy, timed-out or temporarily
 unavailable inference returns retryable `503`. Invalid model output and unexpected
-internal inference failures return non-retryable `500` without a decision. Both model operations share the process's CPU and memory; concurrent
-inference can use twice the configured intra-operation threads. Set CPU/memory limits
+internal inference failures return non-retryable `500` without a decision. Models
+share the process's CPU and memory; concurrent requests can occupy different model
+workers. Budget threads and memory for all configured models. Set CPU/memory limits
 at deployment and measure mixed traffic before increasing threads or replicas.
 
 For containers, build with `--build-arg INFERENCE=true`, mount a prepared Hugging Face
 cache read-only, and set each model's `__CACHE_DIR` to the mounted cache root. Policy
 and rule files must also be mounted. The default image contains no inference packages
 or weights. Each process loads its own model copies; account for startup memory peaks.
-The initial adapters use FP32; quantization and ONNX execution are not implemented.
+The Transformers adapters use FP32. The optional ONNX backend has a separate
+installation and does not automatically quantize models.
 When using a model file, mount it read-only and set its cache paths to the mounted
 cache location inside the container.
 The container runs as UID/GID `10001:10001`; configuration, weights and parent
@@ -104,3 +110,5 @@ If Modera itself is unreachable, it cannot run fallback. The caller must retry, 
 content pending, or explicitly run its own reduced rules policy. A local rules result
 must not be recorded as a completed Modera/model evaluation. A no-match rules result
 only means the configured literal phrases were absent; it does not establish safety.
+
+For object detection, see [Use an object detector](detectors.md).

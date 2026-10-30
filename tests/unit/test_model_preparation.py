@@ -31,7 +31,7 @@ def test_preparation_pins_downloads_and_validates_before_reporting_ready(
             import_module=lambda name: SimpleNamespace(snapshot_download=download)
         ),
     )
-    monkeypatch.setattr(preparation, "Classifier", classifier)
+    monkeypatch.setattr(preparation, "create_adapter", classifier)
     monkeypatch.delenv("MODERA_API_KEY")
     preparation.prepare_models(
         ModelConfig(
@@ -85,7 +85,7 @@ def test_cli_reports_failure_without_raw_exception_or_false_success(
             import_module=lambda name: SimpleNamespace(snapshot_download=download)
         ),
     )
-    monkeypatch.setattr(preparation, "Classifier", classifier)
+    monkeypatch.setattr(preparation, "create_adapter", classifier)
     with pytest.raises(SystemExit) as error:
         preparation.main()
     assert error.value.code == 1

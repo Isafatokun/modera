@@ -4,6 +4,7 @@ x-runtime: &runtime
     context: .
     args:
       INFERENCE: "true"
+      ONNX: ${MODERA_ONNX:-false}
   init: true
   read_only: true
   cap_drop: [ALL]

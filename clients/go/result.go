@@ -15,6 +15,7 @@ func (f *Finding) UnmarshalJSON(data []byte) error {
 		Category string   `json:"category"`
 		Score    *float64 `json:"score"`
 		Source   string   `json:"source"`
+		Model    string   `json:"model"`
 	}
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
@@ -22,7 +23,7 @@ func (f *Finding) UnmarshalJSON(data []byte) error {
 	if value.Score == nil {
 		return errors.New("modera: finding score is required")
 	}
-	*f = Finding{Category: value.Category, Score: *value.Score, Source: value.Source}
+	*f = Finding{Category: value.Category, Score: *value.Score, Source: value.Source, Model: value.Model}
 	return nil
 }
 
@@ -42,6 +43,8 @@ type ModelVersion struct {
 type Decision struct {
 	Action  string   `json:"action"`
 	Reasons []string `json:"reasons"`
+	// MatchedRules identifies composite rules contributing to the chosen action.
+	MatchedRules []string `json:"matched_rules,omitempty"`
 }
 
 // Finding contains a category score and its model or rules source.
@@ -49,6 +52,8 @@ type Finding struct {
 	Category string  `json:"category"`
 	Score    float64 `json:"score"`
 	Source   string  `json:"source"`
+	// Model identifies the producer; it can be absent for a legacy single model.
+	Model string `json:"model,omitempty"`
 }
 
 // Coverage distinguishes evaluated, unsupported, and inapplicable categories.
@@ -126,12 +131,27 @@ func (r *Result) validate(kind string) error {
 		}
 		reasons[category] = true
 	}
+	matchedRules := map[string]bool{}
+	for _, rule := range r.Decision.MatchedRules {
+		if !categoryPattern.MatchString(rule) || matchedRules[rule] || r.Decision.Action == "allow" {
+			return bad
+		}
+		matchedRules[rule] = true
+	}
 	models := map[string]bool{}
 	for _, model := range r.Models {
 		if !plain(model.ID, 200) || !plain(model.Revision, 128) || models[model.ID] {
 			return bad
 		}
 		models[model.ID] = true
+	}
+	for _, finding := range r.Findings {
+		if finding.Model != "" && (finding.Source != "model" || !models[finding.Model]) {
+			return bad
+		}
+		if len(models) > 1 && finding.Source == "model" && finding.Model == "" {
+			return bad
+		}
 	}
 	return nil
 }

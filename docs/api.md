@@ -149,3 +149,8 @@ result or business action, so retrying creates no duplicate moderation side effe
 URL bytes and model/policy configuration can change between attempts. Pending
 work does not survive restart. OpenAPI: `/openapi.json` when enabled, with bearer
 authentication documented. Health checks and enabled documentation are unauthenticated.
+
+When multiple image models are configured, model findings also contain `model`,
+matching an ID in `models`. Triggered composite rules contributing to the selected
+action appear in `decision.matched_rules`; reasons remain category names. These
+fields are omitted when unused. See [combining models](combining-models.md).

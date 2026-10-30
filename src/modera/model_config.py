@@ -45,15 +45,70 @@ class ImageModelSettings(PinnedModelSettings):
     )
 
 
+class DetectorModelSettings(PinnedModelSettings):
+    """Pinned Transformers object detector; category scores use box maxima."""
+
+    backend: Literal["transformers_object_detection"] = "transformers_object_detection"
+
+
+class OnnxDetectorSettings(PinnedModelSettings):
+    """Explicit batch-one YOLOv8 proposal layout; no arbitrary ONNX auto-detection."""
+
+    backend: Literal["onnx_yolo_v8"] = "onnx_yolo_v8"
+    filename: Annotated[
+        str, Field(max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.onnx$")
+    ]
+    sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    labels: Annotated[
+        tuple[Annotated[str, Field(min_length=1, max_length=100)], ...],
+        Field(min_length=1, max_length=256),
+    ]
+    input_size: Annotated[int, Field(ge=32, le=1280)]
+    channel_order: Literal["rgb", "bgr"]
+
+    @model_validator(mode="after")
+    def validate_labels(self) -> Self:
+        if len(set(self.labels)) != len(self.labels) or not set(self.label_map) <= set(
+            self.labels
+        ):
+            raise ValueError("ONNX mappings require unique ordered native labels")
+        return self
+
+
+ImageSettings = ImageModelSettings | DetectorModelSettings | OnnxDetectorSettings
+
+
+def validate_image_models(
+    image: ImageSettings | None, images: tuple[ImageSettings, ...]
+) -> None:
+    if image is not None and images:
+        raise ValueError("use image or image_models, not both")
+    ids: set[str] = set()
+    categories: set[str] = set()
+    for model in images:
+        if model.id in ids or categories.intersection(model.label_map.values()):
+            raise ValueError("image models require unique IDs and disjoint categories")
+        ids.add(model.id)
+        categories.update(model.label_map.values())
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     text: TextModelSettings | None = None
-    image: ImageModelSettings | None = None
+    image: ImageSettings | None = None
+    image_models: Annotated[tuple[ImageSettings, ...], Field(max_length=4)] = ()
+
+    @property
+    def configured_images(self) -> tuple[ImageSettings, ...]:
+        return (self.image,) if self.image is not None else self.image_models
 
     @model_validator(mode="after")
     def validate_selections(self) -> Self:
-        selections = [model for model in (self.text, self.image) if model is not None]
+        validate_image_models(self.image, self.image_models)
+        selections = ([self.text] if self.text is not None else []) + list(
+            self.configured_images
+        )
         if not selections:
             raise ValueError("configure at least one model")
         if any(
@@ -76,12 +131,20 @@ def load_models(path: Path) -> ModelConfig:
         raise ValueError(
             "model configuration could not be loaded or is invalid"
         ) from None
-    updates = {}
-    for kind, model in (("text", models.text), ("image", models.image)):
-        if model is not None and model.cache_dir is not None:
-            updates[kind] = model.model_copy(
-                update={
-                    "cache_dir": (path.resolve().parent / model.cache_dir).resolve()
-                }
-            )
-    return models.model_copy(update=updates)
+
+    def resolve(
+        model: TextModelSettings | ImageSettings,
+    ) -> TextModelSettings | ImageSettings:
+        if model.cache_dir is None:
+            return model
+        return model.model_copy(
+            update={"cache_dir": (path.resolve().parent / model.cache_dir).resolve()}
+        )
+
+    return models.model_copy(
+        update={
+            "text": resolve(models.text) if models.text is not None else None,
+            "image": resolve(models.image) if models.image is not None else None,
+            "image_models": tuple(resolve(model) for model in models.image_models),
+        }
+    )

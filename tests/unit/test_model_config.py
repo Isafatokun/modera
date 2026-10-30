@@ -137,3 +137,34 @@ def test_application_keeps_its_model_selection_snapshot(
     second = create_app()
     assert first.state.text_model.id == "unitary/toxic-bert"
     assert second.state.text_model.id == "Horizon-Labs/multilingual-toxicity-small"
+
+
+@pytest.mark.parametrize("change", ["path", "digest", "order", "mapping", "channels"])
+def test_onnx_configuration_requires_explicit_safe_artifacts(change: str) -> None:
+    import json
+
+    from modera.model_config import ModelConfig
+
+    raw = {
+        "backend": "onnx_yolo_v8",
+        "id": "example/detector",
+        "revision": "a" * 40,
+        "filename": "model.onnx",
+        "sha256": "b" * 64,
+        "input_size": 320,
+        "channel_order": "rgb",
+        "labels": ["a", "b"],
+        "label_map": {"a": "detect.a"},
+    }
+    if change == "path":
+        raw["filename"] = "../model.onnx"
+    elif change == "digest":
+        raw["sha256"] = "unknown"
+    elif change == "order":
+        raw["labels"] = ["a", "a"]
+    elif change == "mapping":
+        raw["label_map"] = {"unknown": "detect.a"}
+    else:
+        raw.pop("channel_order")
+    with pytest.raises(ValueError):
+        ModelConfig.model_validate_json(json.dumps({"image": raw}))

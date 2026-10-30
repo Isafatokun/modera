@@ -47,3 +47,6 @@ Mount files read-only in containers. The example is not included in the runtime 
 
 No file or thresholds are installed by default. Configuring any moderation backend
 requires a policy file; unconfigured modalities return `501`.
+
+For image-wide combinations of evidence from different models, see
+[combining models](combining-models.md). Existing individual thresholds still apply.

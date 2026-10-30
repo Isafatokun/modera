@@ -18,7 +18,7 @@ its secret store. Keep the endpoint behind the deployment's network controls.
 | `modera_moderation_requests_in_flight` | Active moderation HTTP requests, including requests being rejected |
 | `modera_decisions_total{input_type,policy,action,fallback}` | Completed policy evaluations, separated by the policy actually used and rules fallback |
 | `modera_category_score{input_type,category,source}` | Histogram of category scores from completed evaluations |
-| `modera_worker_active{worker}` | Occupied worker slot (`0` or `1`), including native work that outlives its HTTP request |
+| `modera_worker_active{worker}` | Occupied native slots, including work that outlives its HTTP request; image inference sums the configured model workers |
 | `modera_worker_waiting{worker}` | Jobs currently waiting for that worker slot |
 
 HTTP counters and latency cover only `POST /v1/moderations`; scrapes, health checks
@@ -49,14 +49,14 @@ metrics do not explain an individual result or establish model accuracy.
 
 `MODERA_MAX_IN_FLIGHT_REQUESTS` defaults to 8 per process. After authentication,
 excess requests receive `503 service_busy` with `Retry-After: 1` before their body
-is read. Photo validation/preparation and inference each have one active slot and
-a bounded FIFO: `MODERA_IMAGE_QUEUE_SIZE=5`, with at most
+is read. Photo validation/preparation and each photo model have one active slot
+and a bounded FIFO: `MODERA_IMAGE_QUEUE_SIZE=5`, with at most
 `MODERA_IMAGE_QUEUE_WAIT_SECONDS=2` seconds of waiting inside the stage deadline.
 Set queue size to `0` for immediate rejection. A full queue returns `503 service_busy`;
 an expired wait returns `503 queue_wait_timeout`. Both include `Retry-After: 1`.
 Downloads and text inference remain fail-fast. Health checks and scrapes bypass
 these limits.
-Text and photo inference each have one slot and reuse their loaded model. A busy
+Text inference and each configured photo model reuse their loaded model. A busy
 photo model does not occupy the text inference slot, or vice versa. This separates
 inference admission; HTTP admission, CPU, memory, and the interpreter remain shared.
 

@@ -237,10 +237,7 @@ def test_loaded_model_shutdown_restart_and_missing_weights(
     with service(environment, log_path, port) as (process, client):
         process.wait(timeout=30)
         assert process.returncode not in (None, 0)
-        assert (
-            "configured classifier could not be loaded or warmed"
-            in log_path.read_text()
-        )
+        assert "configured model could not be loaded or warmed" in log_path.read_text()
         assert "Application startup complete." not in log_path.read_text()
         with pytest.raises(httpx.HTTPError):
             client.get("/health/ready")

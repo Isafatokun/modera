@@ -5,13 +5,19 @@ from collections.abc import Callable
 from contextlib import ExitStack, closing
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, Protocol
 
 from PIL import ExifTags, Image, ImageOps
 
 from modera.errors import APIError
 from modera.images import decode_image
-from modera.model_config import ImageModelSettings, TextModelSettings
+from modera.model_config import (
+    DetectorModelSettings,
+    ImageModelSettings,
+    ImageSettings,
+    OnnxDetectorSettings,
+    TextModelSettings,
+)
 from modera.results import Finding
 from modera.workers import BoundedWorker, WorkerCapacity
 
@@ -27,6 +33,14 @@ class InvalidModelOutput(Exception):
 @dataclass(frozen=True, slots=True, repr=False)
 class PreparedImage:
     inputs: dict[str, Any]
+
+
+class ModelAdapter(Protocol):
+    """Synchronous inference contract; calls run on the bounded model worker."""
+
+    categories: frozenset[str]
+
+    def predict(self, content: str | bytes | PreparedImage) -> list[Finding]: ...
 
 
 class Classifier:
@@ -150,6 +164,139 @@ class Classifier:
             Finding(category=category, score=values[self._indices[label]])
             for label, category in self._label_map.items()
         ]
+
+
+class Detector:
+    """Transformers detector with complete, validated category-level evidence.
+
+    Boxes remain internal. No confidence cutoff is applied before policy evaluation.
+    """
+
+    def __init__(self, settings: DetectorModelSettings, threads: int) -> None:
+        self.settings = settings.model_copy(deep=True)
+        if not settings.label_map:
+            raise ValueError("configured detectors require explicit label mappings")
+        self.categories = frozenset(settings.label_map.values())
+        os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+        self._torch = importlib.import_module("torch")
+        transformers = importlib.import_module("transformers")
+        self._torch.set_num_threads(threads)
+        options = {
+            "revision": settings.revision,
+            "cache_dir": str(settings.cache_dir) if settings.cache_dir else None,
+            "local_files_only": True,
+            "trust_remote_code": False,
+        }
+        self._model, loading = transformers.AutoModelForObjectDetection.from_pretrained(
+            settings.id,
+            **options,
+            use_safetensors=True,
+            dtype=self._torch.float32,
+            output_loading_info=True,
+        )
+        if any(
+            loading.get(key)
+            for key in (
+                "missing_keys",
+                "unexpected_keys",
+                "mismatched_keys",
+                "error_msgs",
+            )
+        ):
+            raise ValueError("checkpoint does not match the detector architecture")
+        self._model.eval()
+        self._labels = dict(self._model.config.id2label)
+        if not set(settings.label_map) <= set(self._labels.values()):
+            raise ValueError("label mappings do not match detector outputs")
+        self._processor = transformers.AutoImageProcessor.from_pretrained(
+            settings.id, **options, backend="pil"
+        )
+        with Image.new("RGB", (32, 32), "white") as image:
+            self.predict(self.prepare_image(image))
+
+    def prepare_image(self, image: Image.Image) -> PreparedImage:
+        with ExitStack() as owned:
+            oriented = image
+            if image.getexif().get(ExifTags.Base.Orientation) in range(2, 9):
+                oriented = owned.enter_context(closing(ImageOps.exif_transpose(image)))
+            rgb = oriented
+            if oriented.mode != "RGB":
+                rgb = owned.enter_context(closing(oriented.convert("RGB")))
+            return PreparedImage(dict(self._processor(images=rgb, return_tensors="pt")))
+
+    def predict(self, content: str | bytes | PreparedImage) -> list[Finding]:
+        if isinstance(content, bytes):
+            with closing(decode_image(content)) as image:
+                content = self.prepare_image(image)
+        if not isinstance(content, PreparedImage):
+            raise TypeError("detector requires image bytes or prepared image")
+        with self._torch.inference_mode():
+            output = self._model(**content.inputs)
+            if not self._torch.isfinite(output.logits).all().item() or not (
+                self._torch.isfinite(output.pred_boxes).all().item()
+            ):
+                raise InvalidModelOutput("non-finite detector output")
+            results = self._processor.post_process_object_detection(
+                output, threshold=0.0
+            )
+        if len(results) != 1:
+            raise InvalidModelOutput("detector must return one image result")
+        result = results[0]
+        return aggregate_detections(
+            result["scores"].tolist(),
+            result["labels"].tolist(),
+            result["boxes"].tolist(),
+            self._labels,
+            self.settings.label_map,
+        )
+
+
+def aggregate_detections(
+    scores: list[float],
+    labels: list[int],
+    boxes: list[list[float]],
+    model_labels: dict[int, str],
+    label_map: dict[str, str],
+) -> list[Finding]:
+    """Validate all detections, including unmapped labels, before aggregation."""
+    import math
+
+    if not len(scores) == len(labels) == len(boxes):
+        raise InvalidModelOutput("inconsistent detector output lengths")
+    maxima = dict.fromkeys(label_map.values(), 0.0)
+    for score, label, box in zip(scores, labels, boxes, strict=True):
+        if (
+            not isinstance(score, (int, float))
+            or isinstance(score, bool)
+            or not math.isfinite(score)
+            or not 0 <= score <= 1
+            or type(label) is not int
+            or label not in model_labels
+            or len(box) != 4
+            or any(not math.isfinite(value) for value in box)
+            or box[0] > box[2]
+            or box[1] > box[3]
+        ):
+            raise InvalidModelOutput("invalid detector evidence")
+        category = label_map.get(model_labels[label])
+        if category is not None:
+            maxima[category] = max(maxima[category], score)
+    return [
+        Finding(category=category, score=score) for category, score in maxima.items()
+    ]
+
+
+def create_adapter(
+    settings: TextModelSettings | ImageSettings,
+    threads: int,
+) -> ModelAdapter:
+    if isinstance(settings, OnnxDetectorSettings):
+        from modera.onnx_detector import OnnxDetector
+
+        return OnnxDetector(settings, threads)
+    if isinstance(settings, DetectorModelSettings):
+        return Detector(settings, threads)
+    return Classifier(settings, threads)
 
 
 class InferenceWorker:

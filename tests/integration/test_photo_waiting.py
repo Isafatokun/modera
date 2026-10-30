@@ -35,7 +35,7 @@ def test_photo_burst_waits_or_returns_an_explicit_retryable_error(
             assert release.wait(5)
             return [Finding(category="sexual", score=0.1)]
 
-    monkeypatch.setattr(engine, "Classifier", BlockingClassifier)
+    monkeypatch.setattr(engine, "create_adapter", BlockingClassifier)
     policy = tmp_path / "policy.json"
     policy.write_text(
         '{"policies":[{"id":"default","version":"1",'

@@ -7,8 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-from modera.inference import Classifier
-from modera.model_config import ModelConfig, load_models
+from modera.inference import create_adapter
+from modera.model_config import ModelConfig, OnnxDetectorSettings, load_models
 
 ARTIFACT_PATTERNS = ["*.json", "*.safetensors", "*.txt", "*.model"]
 
@@ -16,7 +16,10 @@ ARTIFACT_PATTERNS = ["*.json", "*.safetensors", "*.txt", "*.model"]
 def prepare_models(models: ModelConfig, *, threads: int, offline: bool) -> None:
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     hub = importlib.import_module("huggingface_hub")
-    for kind, selection in (("text", models.text), ("image", models.image)):
+    selections = [("text", models.text)] + [
+        ("image", model) for model in models.configured_images
+    ]
+    for kind, selection in selections:
         if selection is None:
             continue
         print(f"Preparing {kind} model", file=sys.stderr, flush=True)
@@ -25,10 +28,12 @@ def prepare_models(models: ModelConfig, *, threads: int, offline: bool) -> None:
             revision=selection.revision,
             cache_dir=selection.cache_dir,
             local_files_only=offline,
-            allow_patterns=ARTIFACT_PATTERNS,
+            allow_patterns=[selection.filename]
+            if isinstance(selection, OnnxDetectorSettings)
+            else ARTIFACT_PATTERNS,
             max_workers=4,
         )
-        Classifier(selection, threads)
+        create_adapter(selection, threads)
         print(
             json.dumps(
                 {

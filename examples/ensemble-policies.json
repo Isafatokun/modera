@@ -1,0 +1,22 @@
+{
+  "policies": [
+    {
+      "id": "default",
+      "version": "example-1",
+      "image": [
+        {"category": "detect.exposed", "block_threshold": 0.9},
+        {"category": "classify.sexual", "block_threshold": 0.9}
+      ],
+      "image_composites": [
+        {
+          "id": "signals-together",
+          "action": "review",
+          "all_of": [
+            {"category": "detect.exposed", "min": 0.7},
+            {"category": "classify.sexual", "min": 0.6}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "image_models": [
+    {
+      "id": "example/detector",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "backend": "transformers_object_detection",
+      "label_map": {"NATIVE_LABEL": "detect.exposed"}
+    },
+    {
+      "id": "example/classifier",
+      "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "label_map": {"NATIVE_LABEL": "classify.sexual"}
+    }
+  ]
+}

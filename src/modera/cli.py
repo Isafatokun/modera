@@ -92,9 +92,11 @@ def diagnose(env_file: Path | None) -> int:
         "text": set(settings.text_model.label_map.values())
         if settings.text_model
         else set(),
-        "image": set(settings.image_model.label_map.values())
-        if settings.image_model
-        else set(),
+        "image": {
+            category
+            for model in settings.configured_image_models
+            for category in model.label_map.values()
+        },
     }
     if rules is not None:
         capabilities["text"].update(rule.category for rule in rules.rules)
@@ -102,8 +104,8 @@ def diagnose(env_file: Path | None) -> int:
         for kind in ("text", "image"):
             # Policies for unconfigured modalities may be retained for later use.
             if capabilities[kind] and any(
-                rule.required and rule.category not in capabilities[kind]
-                for rule in (policy.text if kind == "text" else policy.image)
+                category not in capabilities[kind]
+                for category in policy.categories_for(kind, required_only=True)
             ):
                 print("ERROR: policy_file requires a category absent from the checks.")
                 return 1

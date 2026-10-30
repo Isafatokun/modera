@@ -106,7 +106,7 @@ def test_http_collection_freezes_proposals_before_test_and_retains_failures(
                 Finding(category="toxicity", score=0.9 if "harmful" in content else 0.1)
             ]
 
-    monkeypatch.setattr(engine, "Classifier", Classifier)
+    monkeypatch.setattr(engine, "create_adapter", Classifier)
     evaluate(directory, candidate, tmp_path / "cache", output)
     report = json.loads((output / "report.json").read_bytes())
     french = report["results"]["toxifrench"]["held_out_assessment"]
