@@ -1,0 +1,38 @@
+{
+  "image": {
+    "backend": "onnx_yolo_v8",
+    "id": "deepghs/nudenet_onnx",
+    "revision": "44956a0587943016350c7815f9e0dec089d45cae",
+    "filename": "320n.onnx",
+    "sha256": "c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f",
+    "input_size": 320,
+    "channel_order": "bgr",
+    "labels": [
+      "FEMALE_GENITALIA_COVERED",
+      "FACE_FEMALE",
+      "BUTTOCKS_EXPOSED",
+      "FEMALE_BREAST_EXPOSED",
+      "FEMALE_GENITALIA_EXPOSED",
+      "MALE_BREAST_EXPOSED",
+      "ANUS_EXPOSED",
+      "FEET_EXPOSED",
+      "BELLY_COVERED",
+      "FEET_COVERED",
+      "ARMPITS_COVERED",
+      "ARMPITS_EXPOSED",
+      "FACE_MALE",
+      "BELLY_EXPOSED",
+      "MALE_GENITALIA_EXPOSED",
+      "ANUS_COVERED",
+      "FEMALE_BREAST_COVERED",
+      "BUTTOCKS_COVERED"
+    ],
+    "label_map": {
+      "BUTTOCKS_EXPOSED": "detect.buttocks_exposed",
+      "FEMALE_BREAST_EXPOSED": "detect.female_breast_exposed",
+      "FEMALE_GENITALIA_EXPOSED": "detect.female_genitalia_exposed",
+      "MALE_GENITALIA_EXPOSED": "detect.male_genitalia_exposed",
+      "ANUS_EXPOSED": "detect.anus_exposed"
+    }
+  }
+}

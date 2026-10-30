@@ -25,6 +25,14 @@ inference = [
     "transformers>=5.20.2,<6",
 ]
 
+onnx = [
+    "huggingface-hub>=2.3,<3",
+    "numpy>=2,<3",
+    "onnx>=1.18,<2",
+    "onnxruntime>=1.22,<2",
+    "opencv-python-headless>=4.12,<5",
+]
+
 [dependency-groups]
 benchmark = [
     "httpx2>=2.16.0",
@@ -47,7 +55,10 @@ packages = ["src/modera"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers -ra"
-markers = ["inference: tests local model adapters; requires the inference extra"]
+markers = [
+    "inference: tests local model adapters; requires the inference extra",
+    "onnx: tests the optional ONNX backend without requiring torch",
+]
 
 [tool.ruff]
 target-version = "py312"

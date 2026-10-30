@@ -46,7 +46,7 @@ def test_modalities_have_independent_bounded_capacity(
                     raise TimeoutError("test did not release inference")
             return [Finding(category=self.category, score=0.1)]
 
-    monkeypatch.setattr(engine, "Classifier", BlockingClassifier)
+    monkeypatch.setattr(engine, "create_adapter", BlockingClassifier)
     policy = tmp_path / "policies.json"
     policy.write_text(
         '{"policies":[{"id":"default","version":"1",'

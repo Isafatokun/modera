@@ -67,3 +67,7 @@ separate image coverage challenge, see [external-source evaluation](external.md)
 
 Use the [category review workflow](review.md) to collect blinded human annotations,
 adjudicate disagreements and export category-specific calibration manifests.
+
+For paired classifier, detector and combined image policies, see
+[image comparison](image-comparison.md). It uses the same held-out case IDs and
+retains failed checks; it does not supply labelled photos or choose thresholds.

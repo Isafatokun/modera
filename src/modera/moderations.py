@@ -1,8 +1,10 @@
 import asyncio
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, FastAPI, Request, Response
-from pydantic import ValidationError
+from pydantic import HttpUrl, ValidationError
 from pydantic.json_schema import models_json_schema
 from python_multipart.exceptions import MultipartParseError
 from starlette.datastructures import FormData
@@ -13,13 +15,14 @@ from modera.auth import authenticate
 from modera.engine import ModerationEngine
 from modera.errors import APIError, ErrorResponse, validation_error
 from modera.inference import PreparedImage
-from modera.policies import InputType, resolve_policy
+from modera.input_types import IMAGE, TEXT, InputType
+from modera.policies import resolve_policy
 from modera.results import ModerationResult
 from modera.schemas import (
     MAX_IMAGE_BYTES,
-    ImageInput,
     ImageUploadRequest,
     ModerationRequest,
+    TextInput,
 )
 
 MAX_JSON_BYTES = 32 * 1024
@@ -31,6 +34,25 @@ router = APIRouter(
     tags=["moderations"],
     dependencies=[Depends(authenticate), Depends(admit_request)],
 )
+
+
+class InputSource(StrEnum):
+    """Internal transport discriminator; never used as an API input type."""
+
+    TEXT = "text"
+    IMAGE_URL = "image_url"
+    IMAGE_UPLOAD = "image_upload"
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedInput:
+    policy: str
+    source: InputSource
+    content: str | bytes
+
+    @property
+    def input_type(self) -> InputType:
+        return TEXT if self.source is InputSource.TEXT else IMAGE
 
 
 class CompleteMultipartParser(MultiPartParser):
@@ -140,7 +162,7 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
 )
 async def moderate(request: Request, response: Response) -> ModerationResult:
     response.headers["Cache-Control"] = "no-store"
-    content: str | bytes | PreparedImage = ""
+    resolved: ResolvedInput
     if request.headers.get("content-encoding", "identity").lower() != "identity":
         raise APIError(
             415,
@@ -156,13 +178,21 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
             match media_type:
                 case "application/json":
                     payload = await validate_json(request)
-                    policy_name = payload.policy
-                    input_type: InputType = payload.input.type
-                    if payload.input.type == "text":
-                        content = payload.input.text
+                    if isinstance(payload.input, TextInput):
+                        resolved = ResolvedInput(
+                            payload.policy, InputSource.TEXT, payload.input.text
+                        )
+                    else:
+                        resolved = ResolvedInput(
+                            payload.policy,
+                            InputSource.IMAGE_URL,
+                            str(payload.input.source.url),
+                        )
                 case "multipart/form-data":
                     policy_name, image_data = await validate_upload(request)
-                    input_type = "image"
+                    resolved = ResolvedInput(
+                        policy_name, InputSource.IMAGE_UPLOAD, image_data
+                    )
                 case _:
                     raise APIError(
                         415,
@@ -179,9 +209,12 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
         ) from exc
     except ValidationError as exc:
         raise validation_error(exc) from exc
+    policy_name = resolved.policy
+    input_type = resolved.input_type
+    content: str | bytes | PreparedImage = resolved.content
     if request.app.state.policies:
         resolve_policy(request.app.state.policies, policy_name, input_type)
-    is_url = media_type == "application/json" and isinstance(payload.input, ImageInput)
+    is_url = resolved.source is InputSource.IMAGE_URL
     engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
     if is_url:
         downloader = request.app.state.downloads
@@ -189,9 +222,14 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
             raise APIError(
                 503, "service_not_ready", "The service is not ready.", retryable=True
             )
-        assert isinstance(payload.input, ImageInput)
-        image_data = await downloader.fetch(payload.input.source.url)
-    if media_type == "multipart/form-data" or is_url:
+        if not isinstance(resolved.content, str):
+            raise TypeError("URL input must contain a URL string")
+        image_data = await downloader.fetch(HttpUrl(resolved.content))
+    elif resolved.source is InputSource.IMAGE_UPLOAD:
+        if not isinstance(resolved.content, bytes):
+            raise TypeError("uploaded input must contain bytes")
+        image_data = resolved.content
+    if resolved.source is not InputSource.TEXT:
         validator = request.app.state.images
         if validator is None:
             raise APIError(

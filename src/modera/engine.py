@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -9,9 +10,23 @@ from PIL import Image
 
 from modera.config import Settings
 from modera.errors import APIError
-from modera.inference import Classifier, InferenceWorker, PreparedImage
-from modera.policies import InputType, Policy, evaluate_policy
-from modera.results import Coverage, ModelVersion, ModerationResult, PolicyVersion
+from modera.inference import (
+    InferenceWorker,
+    InvalidModelOutput,
+    ModelAdapter,
+    PreparedImage,
+    create_adapter,
+)
+from modera.input_types import IMAGE, TEXT, InputType
+from modera.model_config import ImageSettings, TextModelSettings
+from modera.policies import Policy, evaluate_policy
+from modera.results import (
+    Coverage,
+    Finding,
+    ModelVersion,
+    ModerationResult,
+    PolicyVersion,
+)
 from modera.rules import load_rules
 from modera.workers import WorkerCapacity
 
@@ -46,40 +61,64 @@ class ModerationEngine:
                 )
         self._versions = {}
         for kind, model in (
-            ("text", settings.text_model),
-            ("image", settings.image_model),
+            (TEXT, settings.text_model),
+            (IMAGE, settings.image_model),
         ):
-            snapshot = {
+            snapshot: dict[str, object] = {
                 "model": model.model_dump(mode="json", exclude={"cache_dir"})
                 if model
                 else None,
                 "rules": self._rules.model_dump(mode="json")
-                if kind == "text" and self._rules
+                if kind == TEXT and self._rules
                 else None,
             }
+            if kind == IMAGE and settings.image_models:
+                snapshot = {
+                    "models": [
+                        model.model_dump(mode="json", exclude={"cache_dir"})
+                        for model in settings.image_models
+                    ]
+                }
             digest = hashlib.sha256(
                 json.dumps(snapshot, sort_keys=True).encode()
             ).hexdigest()
             self._versions[kind] = f"{kind}-v1.{digest}"
-        self._text: Classifier | None = None
-        self._image: Classifier | None = None
+        self._text: ModelAdapter | None = None
+        self._image: ModelAdapter | None = None
         self._workers = {
             kind: InferenceWorker(
                 settings.inference_timeout_seconds,
-                settings.image_queue_size if kind == "image" else 0,
+                settings.image_queue_size if kind == IMAGE else 0,
                 settings.image_queue_wait_seconds,
             )
-            for kind in ("text", "image")
+            for kind in (TEXT, IMAGE)
+        }
+
+        self._image_adapters: dict[str, ModelAdapter] = {}
+        self._image_workers = {
+            model.id: self._workers[IMAGE]
+            if index == 0
+            else InferenceWorker(
+                settings.inference_timeout_seconds,
+                settings.image_queue_size,
+                settings.image_queue_wait_seconds,
+            )
+            for index, model in enumerate(settings.configured_image_models)
         }
 
     def enabled(self, input_type: InputType) -> bool:
         return bool(
-            self._settings.image_model
-            if input_type == "image"
+            self._settings.configured_image_models
+            if input_type == IMAGE
             else self._settings.text_model or self._rules
         )
 
     def worker_capacity(self, input_type: InputType) -> WorkerCapacity:
+        if input_type == IMAGE and self._image_workers:
+            capacities = [worker.capacity for worker in self._image_workers.values()]
+            return WorkerCapacity(
+                sum(c.active for c in capacities), sum(c.waiting for c in capacities)
+            )
         return self._workers[input_type].capacity
 
     @property
@@ -92,13 +131,14 @@ class ModerationEngine:
         )
 
     async def start(self) -> None:
-        kinds: tuple[InputType, ...] = ("text", "image")
+        kinds: tuple[InputType, ...] = (TEXT, IMAGE)
         if any(self.enabled(kind) for kind in kinds) and not self._policies:
             raise ValueError("moderation backends require a policy file")
-        for kind, selection in (
-            ("text", self._settings.text_model),
-            ("image", self._settings.image_model),
-        ):
+        selections: list[tuple[InputType, TextModelSettings | ImageSettings | None]] = [
+            (TEXT, self._settings.text_model),
+            *((IMAGE, model) for model in self._settings.configured_image_models),
+        ]
+        for kind, selection in selections:
             if selection is None:
                 continue
             if not selection.label_map or any(
@@ -106,12 +146,16 @@ class ModerationEngine:
             ):
                 raise ValueError("models require explicit non-rules category mappings")
             try:
-                adapter = await self._workers[kind].initialize(
-                    partial(Classifier, selection, self._settings.inference_threads)
+                adapter = await (
+                    self._image_workers[selection.id]
+                    if kind == IMAGE
+                    else self._workers[TEXT]
+                ).initialize(
+                    partial(create_adapter, selection, self._settings.inference_threads)
                 )
             except Exception as exc:
                 if (
-                    kind == "text"
+                    kind == TEXT
                     and self._settings.text_fallback == "rules"
                     and isinstance(exc, (OSError, ImportError))
                 ):
@@ -121,12 +165,14 @@ class ModerationEngine:
                     )
                     continue
                 raise RuntimeError(
-                    "configured classifier could not be loaded or warmed"
+                    "configured model could not be loaded or warmed"
                 ) from None
-            if kind == "text":
+            if kind == TEXT:
                 self._text = adapter
             else:
-                self._image = adapter
+                self._image_adapters[selection.id] = adapter
+                if len(self._settings.configured_image_models) == 1:
+                    self._image = adapter
 
     async def evaluate(
         self,
@@ -135,32 +181,29 @@ class ModerationEngine:
         policy: Policy,
         request_id: str,
     ) -> ModerationResult:
-        selection = (
-            self._settings.text_model
-            if input_type == "text"
-            else self._settings.image_model
+        selections: tuple[TextModelSettings | ImageSettings, ...] = (
+            self._settings.configured_image_models
+            if input_type == IMAGE
+            else ((self._settings.text_model,) if self._settings.text_model else ())
         )
-        adapter = self._text if input_type == "text" else self._image
-        rules = self._rules if input_type == "text" else None
+        rules = self._rules if input_type == TEXT else None
         findings = (
             rules.evaluate(content)
             if rules is not None and isinstance(content, str)
             else []
         )
         capabilities = {finding.category for finding in findings}
-        if selection is not None:
+        for selection in selections:
             capabilities.update(selection.label_map.values())
-        policy_rules = policy.rules_for(input_type)
-        if any(
-            rule.required and rule.category not in capabilities for rule in policy_rules
-        ):
+        needed = policy.categories_for(input_type)
+        if policy.categories_for(input_type, required_only=True) - capabilities:
             raise APIError(
                 400,
                 "policy_unsupported",
                 "A required policy check cannot evaluate this input.",
                 param="policy",
             )
-        if not any(rule.category in capabilities for rule in policy_rules):
+        if not needed.intersection(capabilities):
             raise APIError(
                 400,
                 "policy_not_applicable",
@@ -169,42 +212,71 @@ class ModerationEngine:
             )
         models: list[ModelVersion] = []
         fallback = False
-        if selection is not None and any(
-            rule.category in selection.label_map.values() for rule in policy_rules
-        ):
-            try:
-                if adapter is None:
-                    raise APIError(
-                        503,
-                        "check_unavailable",
-                        "The text model is unavailable.",
-                        retryable=True,
-                        headers={"Retry-After": "1"},
+        try:
+            # One overall inference budget, rather than one full budget per model.
+            async with asyncio.timeout(
+                self._settings.inference_timeout_seconds
+                if input_type == IMAGE
+                else None
+            ):
+                for selection in selections:
+                    if not needed.intersection(selection.label_map.values()):
+                        continue
+                    adapter = (
+                        self._image_adapters.get(selection.id)
+                        if input_type == IMAGE
+                        else self._text
                     )
-                model_findings = await self._workers[input_type].run(
-                    partial(adapter.predict, content)
-                )
-                findings.extend(model_findings)
-                models.append(
-                    ModelVersion(id=selection.id, revision=selection.revision)
-                )
-            except APIError as exc:
-                if (
-                    input_type != "text"
-                    or self._settings.text_fallback != "rules"
-                    or exc.status_code != 503
-                ):
-                    raise
-                fallback = True
-                if self._fallback_policy is not None:
-                    policy = self._fallback_policy
+                    worker = (
+                        self._image_workers[selection.id]
+                        if input_type == IMAGE
+                        else self._workers[TEXT]
+                    )
+                    try:
+                        if adapter is None:
+                            raise APIError(
+                                503,
+                                "check_unavailable",
+                                "The model is unavailable.",
+                                retryable=True,
+                                headers={"Retry-After": "1"},
+                            )
+                        operation = partial(adapter.predict, content)
+                        if len(selections) > 1:
+                            operation = partial(
+                                self._predict_image, adapter, content, selection
+                            )
+                        model_findings = await worker.run(operation)
+                        if len(selections) > 1:
+                            model_findings = [
+                                finding.model_copy(update={"model": selection.id})
+                                for finding in model_findings
+                            ]
+                        findings.extend(model_findings)
+                        models.append(
+                            ModelVersion(id=selection.id, revision=selection.revision)
+                        )
+                    except APIError as exc:
+                        if (
+                            input_type != TEXT
+                            or self._settings.text_fallback != "rules"
+                            or exc.status_code != 503
+                        ):
+                            raise
+                        fallback = True
+                        if self._fallback_policy is not None:
+                            policy = self._fallback_policy
+        except TimeoutError as exc:
+            raise APIError(
+                503,
+                "check_unavailable",
+                "Model evaluation exceeded its deadline.",
+                retryable=True,
+                headers={"Retry-After": "1"},
+            ) from exc
         coverage = Coverage(
             evaluated=[finding.category for finding in findings],
-            unsupported=[
-                rule.category
-                for rule in policy.rules_for(input_type)
-                if rule.category not in capabilities
-            ],
+            unsupported=sorted(policy.categories_for(input_type) - capabilities),
             not_applicable=[],
         )
         decision = evaluate_policy(policy, input_type, findings, coverage)
@@ -221,8 +293,27 @@ class ModerationEngine:
             preprocessing_version=self._versions[input_type],
         )
 
+    @staticmethod
+    def _predict_image(
+        adapter: ModelAdapter,
+        content: str | bytes | PreparedImage,
+        selection: TextModelSettings | ImageSettings,
+    ) -> list[Finding]:
+        findings = adapter.predict(content)
+        if (
+            len(findings) != len(selection.label_map)
+            or {finding.category for finding in findings}
+            != set(selection.label_map.values())
+            or any(finding.source != "model" for finding in findings)
+        ):
+            raise InvalidModelOutput(
+                "model evidence does not match configured categories"
+            )
+        return findings
+
     def close(self) -> None:
-        for worker in self._workers.values():
+        for worker in set(self._workers.values()) | set(self._image_workers.values()):
             worker.close()
         self._text = None
         self._image = None
+        self._image_adapters.clear()

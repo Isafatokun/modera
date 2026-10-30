@@ -197,7 +197,7 @@ def test_worker_metrics_track_waiting_and_native_work_after_http_ends(
                 block()
             return [Finding(category="sexual", score=0.1)]
 
-    monkeypatch.setattr(engine, "Classifier", BlockingClassifier)
+    monkeypatch.setattr(engine, "create_adapter", BlockingClassifier)
     if worker == "image_preparation":
         original = images.validate_image
 

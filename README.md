@@ -2,8 +2,8 @@
 
 Text and photo moderation service.
 
-A synchronous API with replaceable text/photo classifiers, configurable policies,
-optional text rules, and explicit failure handling. Models and policies are operator
+A synchronous API with replaceable classifiers and photo detectors, configurable
+policies, optional text rules, and explicit failure handling. Models and policies are operator
 configured; an unconfigured modality returns `501`.
 
 New here? [Start here](docs/start-here.md) for the rules demo, real-model setup
@@ -33,6 +33,8 @@ versions actually used, and a request ID. **Your application** publishes, holds
 for review or rejects content; Modera does not perform those actions or store a
 review queue. An error is not an allow decision, and `allow` covers only the
 configured checks.
+
+For a detector and classifier on the same photo, see [combining models](docs/combining-models.md).
 
 See [how to use the result](docs/how-it-works.md) for the request flow,
 configuration choices, fallback and retry behavior.

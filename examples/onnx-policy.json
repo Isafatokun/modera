@@ -1,0 +1,11 @@
+{
+  "policies": [
+    {
+      "id": "default",
+      "version": "example-1",
+      "image": [
+        {"category": "detect.female_breast_exposed", "block_threshold": 0.95}
+      ]
+    }
+  ]
+}

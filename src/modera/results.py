@@ -28,6 +28,9 @@ class ModelVersion(ResultModel):
 class Decision(ResultModel):
     action: Literal["allow", "review", "block"]
     reasons: list[Category]
+    matched_rules: list[Category] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
 
     @model_validator(mode="after")
     def validate_reasons(self) -> Self:
@@ -35,6 +38,10 @@ class Decision(ResultModel):
             raise ValueError("allow decisions must not contain reasons")
         if self.action != "allow" and not self.reasons:
             raise ValueError("review and block decisions require reasons")
+        if self.matched_rules and self.action == "allow":
+            raise ValueError("allow decisions cannot contain matched rules")
+        if len(self.matched_rules) != len(set(self.matched_rules)):
+            raise ValueError("matched rule IDs must be unique")
         if len(self.reasons) != len(set(self.reasons)):
             raise ValueError("decision reasons must be unique")
         return self
@@ -44,6 +51,13 @@ class Finding(ResultModel):
     category: Category
     score: Score
     source: Literal["model", "rules"] = "model"
+    model: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=r"^\S+$",
+        exclude_if=lambda value: value is None,
+    )
 
 
 class Coverage(ResultModel):
@@ -84,6 +98,18 @@ class ModerationResult(ResultModel):
             raise ValueError("model findings require model provenance")
         if self.fallback and self.rules_version is None:
             raise ValueError("fallback requires rules provenance")
+        model_ids = {model.id for model in self.models}
+        if any(
+            f.model is not None and (f.source != "model" or f.model not in model_ids)
+            for f in self.findings
+        ):
+            raise ValueError(
+                "finding model references require matching model provenance"
+            )
+        if len(model_ids) > 1 and any(
+            f.source == "model" and f.model is None for f in self.findings
+        ):
+            raise ValueError("multiple models require finding attribution")
         categories = [finding.category for finding in self.findings]
         if len(categories) != len(set(categories)):
             raise ValueError("finding categories must be unique")
