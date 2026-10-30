@@ -145,3 +145,29 @@ def test_cli_hashes_inputs_and_refuses_overwrite(
     assert report["profiles"]["combined"]["overall"]["cases"] == 2
     with pytest.raises(FileExistsError):
         main()
+
+
+def test_text_study_preparation_ignores_image_candidates(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
+    import sys
+
+    from evaluation import compare_text
+
+    prepared: list[str] = []
+
+    def capture(models: Any, *, threads: int, offline: bool) -> None:
+        assert models.text is not None
+        assert not models.configured_images
+        assert threads == 2 and not offline
+        prepared.append(models.text.id)
+
+    monkeypatch.setattr(compare_text, "prepare_models", capture)
+    monkeypatch.setattr(
+        sys, "argv", ["compare_text", "models", "--cache", str(tmp_path)]
+    )
+    compare_text.main()
+    assert prepared == [
+        "gravitee-io/distilbert-multilingual-toxicity-classifier",
+        "Horizon-Labs/multilingual-toxicity-small",
+    ]

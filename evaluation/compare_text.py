@@ -251,7 +251,9 @@ def main() -> None:
     if args.command == "prepare":
         prepare(args.directory, args.cache, args.per_label)
     elif args.command == "models":
-        for path in sorted((Path(__file__).parent / "candidates").glob("*.json")):
+        # Freeze this study's candidates; other modalities share the directory.
+        for filename in ("gravitee-distilbert.json", "horizon-small.json"):
+            path = Path(__file__).parent / "candidates" / filename
             selection = TextModelSettings.model_validate_json(path.read_bytes())
             selection = selection.model_copy(
                 update={"cache_dir": args.cache.resolve() / "hub"}

@@ -93,7 +93,7 @@ def test_invalid_output_never_becomes_clean_evidence(broken: str) -> None:
 
 @pytest.fixture
 def artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> OnnxDetectorSettings:
-    import huggingface_hub
+    huggingface_hub = pytest.importorskip("huggingface_hub")
 
     tensor = onnx.numpy_helper.from_array(output(), name="evidence")
     graph = onnx.helper.make_graph(
