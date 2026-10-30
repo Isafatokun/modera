@@ -50,8 +50,9 @@ rejects immediately when busy. Text and photos can run concurrently,
 using their existing model instances. Threads default to 2 per model operation;
 the deadline defaults to 5 seconds
 (`MODERA_INFERENCE_THREADS`, `MODERA_INFERENCE_TIMEOUT_SECONDS`). Timed-out native
-work retains its modality's slot until completion. Busy/failed inference returns
-retryable `503`. Both model operations share the process's CPU and memory; concurrent
+work retains its modality's slot until completion. Busy, timed-out or temporarily
+unavailable inference returns retryable `503`. Invalid model output and unexpected
+internal inference failures return non-retryable `500` without a decision. Both model operations share the process's CPU and memory; concurrent
 inference can use twice the configured intra-operation threads. Set CPU/memory limits
 at deployment and measure mixed traffic before increasing threads or replicas.
 
@@ -80,7 +81,7 @@ Scores are binary: 1 for a match, 0 otherwise, not probabilities. Results identi
 `source: "rules"`, `rules_version`, and only the coverage actually evaluated.
 
 Fallback defaults to errors. To explicitly permit a reduced rules-only policy when
-text inference fails, is busy, times out, or cannot load:
+text inference is temporarily unavailable, busy, times out, or cannot load:
 
 ```sh
 export MODERA_TEXT_RULES_FILE=examples/text-rules.json
@@ -92,7 +93,8 @@ The fallback policy must contain only configured rule categories. Its actual ID 
 version appear in `policy`, alongside `fallback: true` and `models: []`. This setting
 applies to all text requests when inference is unavailable. Without an explicit
 fallback policy, the requested policy still applies: missing model checks return
-`503`, even if no rule matched. Invalid input never triggers model fallback.
+`503`, even if no rule matched. Invalid input, invalid model output and internal inference errors never trigger
+model fallback.
 Readiness permits unavailable cached text weights or missing inference dependencies
 only when rules fallback is explicitly enabled. Invalid classifier configuration
 (including label mappings) and photo-model startup failures remain fatal. Restart to
