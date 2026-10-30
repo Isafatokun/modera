@@ -120,6 +120,7 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
             415: "Unsupported request content type or content encoding",
             422: "Image data is invalid or the source rejected retrieval",
             503: "Image processing is busy or the source is temporarily unavailable",
+            500: "Internal model or result failure; no decision",
             501: "No moderation backend is configured for this input",
         }.items()
     },
@@ -227,7 +228,11 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
             "No moderation backend is configured for this input.",
         )
     policy = resolve_policy(request.app.state.policies, policy_name, input_type)
-    return await engine.evaluate(input_type, content, policy, request.state.request_id)
+    result = await engine.evaluate(
+        input_type, content, policy, request.state.request_id
+    )
+    request.app.state.metrics.observe_decision(result)
+    return result
 
 
 def register_contract_schemas(app: FastAPI) -> None:

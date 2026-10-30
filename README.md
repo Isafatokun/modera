@@ -6,6 +6,37 @@ A synchronous API with replaceable text/photo classifiers, configurable policies
 optional text rules, and explicit failure handling. Models and policies are operator
 configured; an unconfigured modality returns `501`.
 
+New here? [Start here](docs/start-here.md) for the rules demo, real-model setup
+and troubleshooting.
+
+## How it works
+
+Send text, a photo upload or an allowed HTTPS photo URL to
+`POST /v1/moderations` with a bearer key and a policy name. Your deployment
+configures the models, optional text rules and policy thresholds.
+
+```mermaid
+flowchart LR
+    app["Your backend"] -->|"POST /v1/moderations"| service
+    config["Deployment settings"] -.->|"Models, text rules and policies"| service
+    subgraph service["Modera"]
+        direction TB
+        validate["Check key, input and capacity"] --> checks["Run text or photo checks"]
+        checks --> policy["Verify results and apply thresholds"]
+    end
+    service -->|"Evaluation completed"| result["200: allow / review / block"]
+    service -->|"Cannot evaluate"| error["Error: no decision"]
+```
+
+The response includes reasons, category scores, coverage, the policy/model
+versions actually used, and a request ID. **Your application** publishes, holds
+for review or rejects content; Modera does not perform those actions or store a
+review queue. An error is not an allow decision, and `allow` covers only the
+configured checks.
+
+See [how to use the result](docs/how-it-works.md) for the request flow,
+configuration choices, fallback and retry behavior.
+
 ## Run
 
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).

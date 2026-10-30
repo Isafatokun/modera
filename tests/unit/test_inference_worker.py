@@ -4,7 +4,7 @@ from threading import Event, get_ident
 import pytest
 
 from modera.errors import APIError
-from modera.inference import InferenceWorker
+from modera.inference import InferenceWorker, InvalidModelOutput, ModelUnavailable
 from modera.results import Finding
 
 
@@ -106,5 +106,37 @@ def test_inference_cancellation_retains_capacity_and_errors_are_sanitized() -> N
             worker.close()
         with pytest.raises(APIError):
             await worker.run(lambda: [])
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "failure,status,code,retryable",
+    [
+        (ValueError("private content"), 500, "model_evaluation_failed", False),
+        (InvalidModelOutput("private content"), 500, "model_output_invalid", False),
+        (ModelUnavailable("private content"), 503, "check_unavailable", True),
+        (APIError(422, "input_too_long", "Too long."), 422, "input_too_long", False),
+    ],
+)
+def test_inference_failure_classification(
+    failure: Exception, status: int, code: str, retryable: bool
+) -> None:
+    def fail() -> list[Finding]:
+        raise failure
+
+    async def scenario() -> None:
+        worker = InferenceWorker(1)
+        try:
+            with pytest.raises(APIError) as error:
+                await worker.run(fail)
+            assert error.value.status_code == status
+            assert error.value.code == code
+            assert error.value.retryable == retryable
+            assert "private" not in error.value.message
+            assert ("Retry-After" in (error.value.headers or {})) == retryable
+            assert await worker.run(lambda: []) == []
+        finally:
+            worker.close()
 
     asyncio.run(scenario())

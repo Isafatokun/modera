@@ -16,6 +16,8 @@ its secret store. Keep the endpoint behind the deployment's network controls.
 | `modera_moderation_requests_total{status_code}` | Completed moderation HTTP responses by status; `0` means the response did not complete, such as cancellation |
 | `modera_moderation_request_duration_seconds` | Histogram covering body reading, validation, downloads, inference, and response sending, including failures |
 | `modera_moderation_requests_in_flight` | Active moderation HTTP requests, including requests being rejected |
+| `modera_decisions_total{input_type,policy,action,fallback}` | Completed policy evaluations, separated by the policy actually used and rules fallback |
+| `modera_category_score{input_type,category,source}` | Histogram of category scores from completed evaluations |
 | `modera_worker_active{worker}` | Occupied worker slot (`0` or `1`), including native work that outlives its HTTP request |
 | `modera_worker_waiting{worker}` | Jobs currently waiting for that worker slot |
 
@@ -26,13 +28,22 @@ cancelled or expired waiters are removed. A busy native worker can remain active
 after HTTP requests fall to zero. Downloads and literal text rules are not included
 in these worker gauges.
 
-Labels contain no content, URLs, policy/model IDs, credentials, or request IDs.
+Decision and score labels come from validated results and operator configuration.
+Unknown policy names in requests never create label values. Keep configured policy
+and category sets small: each histogram adds a series per bucket and label set.
+Labels contain no content, URLs, model IDs, credentials, or request IDs.
 Counters reset on restart; the monitoring system retains history.
 
 Track the `503` rate alongside latency and active requests. A `503` can indicate
 request capacity, an occupied inference/validation worker, or an unavailable check;
 the API error code distinguishes these cases for callers. Size and tune limits
 using the chosen models, instance resources, media sizes, and representative traffic.
+
+Decision counters count completed evaluations, even if the caller disconnects before
+receiving the response. They are not counts of published content. Errors produce
+no decision or score samples. Scores are model signals, not calibrated probabilities;
+compare distributions only with the model, policy and input mix in mind. Aggregate
+metrics do not explain an individual result or establish model accuracy.
 
 ## Overload and recovery
 
