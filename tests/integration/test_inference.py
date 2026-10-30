@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from modera import engine
 from modera.config import Settings
+from modera.inference import InvalidModelOutput, ModelUnavailable
 from modera.main import create_app
 from modera.model_config import ImageModelSettings, TextModelSettings
 from modera.results import Finding, ModerationResult
@@ -24,7 +25,7 @@ class FakeClassifier:
 
     def predict(self, content: str | bytes) -> list[Finding]:
         if self.fail:
-            raise RuntimeError("private input must not leak")
+            raise ModelUnavailable("private input must not leak")
         return [
             Finding(category=category, score=0.9 if content == "harmful" else 0.1)
             for category in self.settings.label_map.values()
@@ -398,3 +399,45 @@ def test_unsupported_policy_is_rejected_before_model_execution(
         )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "policy_unsupported"
+
+
+@pytest.mark.parametrize("failure", [InvalidModelOutput, RuntimeError])
+def test_internal_model_failure_never_uses_rules_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    auth_headers: dict[str, str],
+    failure: type[Exception],
+) -> None:
+    monkeypatch.setattr(engine, "Classifier", FakeClassifier)
+    settings = Settings(
+        **configuration(tmp_path, model_required=True),
+        text_model=TextModelSettings(
+            id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+        ),
+        text_fallback="rules",
+        text_fallback_policy="fallback",
+    )
+    # A separate rules-only fallback would permit an allow if this error were 503.
+    policies = json.loads(tmp_path.joinpath("policy.json").read_text())
+    policies["policies"].append(
+        {
+            "id": "fallback",
+            "version": "1",
+            "text": [{"category": "rules.blocklist", "block_threshold": 1.0}],
+        }
+    )
+    tmp_path.joinpath("policy.json").write_text(json.dumps(policies))
+
+    def fail(self: FakeClassifier, content: str | bytes) -> list[Finding]:
+        raise failure("private input must not leak")
+
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        monkeypatch.setattr(FakeClassifier, "predict", fail)
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+        assert response.status_code == 500
+        assert response.json()["error"]["retryable"] is False
+        assert "Retry-After" not in response.headers
+        assert "decision" not in response.json()
+        assert "private input" not in response.text

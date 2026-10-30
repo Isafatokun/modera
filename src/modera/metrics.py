@@ -15,6 +15,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from modera.auth import authenticate
+from modera.results import ModerationResult
 from modera.workers import WorkerCapacity
 
 router = APIRouter(dependencies=[Depends(authenticate)])
@@ -27,6 +28,19 @@ class Metrics:
             "modera_moderation_requests_total",
             "Moderation requests by HTTP status; 0 means no complete response.",
             ["status_code"],
+            registry=self.registry,
+        )
+        self.decisions = Counter(
+            "modera_decisions_total",
+            "Completed policy evaluations, including explicit rules fallback.",
+            ["input_type", "policy", "action", "fallback"],
+            registry=self.registry,
+        )
+        self.scores = Histogram(
+            "modera_category_score",
+            "Category scores from completed evaluations; not calibrated probabilities.",
+            ["input_type", "category", "source"],
+            buckets=(0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1),
             registry=self.registry,
         )
         self.duration = Histogram(
@@ -52,6 +66,18 @@ class Metrics:
             ["worker"],
             registry=self.registry,
         )
+
+    def observe_decision(self, result: ModerationResult) -> None:
+        self.decisions.labels(
+            result.input_type,
+            result.policy.id,
+            result.decision.action,
+            str(result.fallback).lower(),
+        ).inc()
+        for finding in result.findings:
+            self.scores.labels(
+                result.input_type, finding.category, finding.source
+            ).observe(finding.score)
 
     def observe_worker(
         self,

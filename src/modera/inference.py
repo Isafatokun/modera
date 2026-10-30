@@ -16,6 +16,14 @@ from modera.results import Finding
 from modera.workers import BoundedWorker, WorkerCapacity
 
 
+class ModelUnavailable(Exception):
+    """A temporary model availability failure; callers may retry."""
+
+
+class InvalidModelOutput(Exception):
+    """The model returned evidence that violates its output contract."""
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class PreparedImage:
     inputs: dict[str, Any]
@@ -29,7 +37,6 @@ class Classifier:
         if not settings.label_map:
             raise ValueError("configured models require explicit label mappings")
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
-        os.environ["ORT_DISABLE_TELEMETRY"] = "1"
         self._torch = importlib.import_module("torch")
         transformers = importlib.import_module("transformers")
         self._torch.set_num_threads(threads)
@@ -132,7 +139,7 @@ class Classifier:
                 logits.shape != (1, len(self._indices))
                 or not self._torch.isfinite(logits).all().item()
             ):
-                raise ValueError("invalid classifier output")
+                raise InvalidModelOutput("invalid classifier output")
             scores = (
                 logits.sigmoid()
                 if self.settings.activation == "sigmoid"
@@ -165,13 +172,21 @@ class InferenceWorker:
                 return await self._worker.run(operation)
         except APIError:
             raise
-        except Exception as exc:
+        except (TimeoutError, ModelUnavailable) as exc:
             raise APIError(
                 503,
                 "check_unavailable",
                 "Model evaluation did not complete.",
                 retryable=True,
                 headers={"Retry-After": "1"},
+            ) from exc
+        except Exception as exc:
+            raise APIError(
+                500,
+                "model_output_invalid"
+                if isinstance(exc, InvalidModelOutput)
+                else "model_evaluation_failed",
+                "Model evaluation failed internally.",
             ) from exc
 
     def close(self) -> None:

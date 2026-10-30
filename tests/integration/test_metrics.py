@@ -300,3 +300,88 @@ def test_worker_metrics_track_waiting_and_native_work_after_http_ends(
                 await asyncio.gather(first, *pending, return_exceptions=True)
 
     asyncio.run(scenario())
+
+
+def test_decision_metrics_count_evaluations_and_exclude_untrusted_labels(
+    tmp_path: Path, auth_headers: dict[str, str]
+) -> None:
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        '{"policies":[{"id":"example","version":"1","text":'
+        '[{"category":"rules.term","review_threshold":0.5,"block_threshold":1}]},'
+        '{"id":"review","version":"1","text":'
+        '[{"category":"rules.term","review_threshold":0}]}]}'
+    )
+    rules = tmp_path / "rules.json"
+    rules.write_text(
+        '{"version":"1","rules":[{"category":"rules.term","phrases":["blocked"]}]}'
+    )
+    with TestClient(
+        create_app(Settings(policy_file=policy, text_rules_file=rules)),
+        headers=auth_headers,
+    ) as client:
+        for content in ("hello", "blocked"):
+            assert (
+                client.post(
+                    "/v1/moderations",
+                    json={
+                        "input": {"type": "text", "text": content},
+                        "policy": "example",
+                    },
+                ).status_code
+                == 200
+            )
+        assert (
+            client.post(
+                "/v1/moderations",
+                json={
+                    "input": {"type": "text", "text": "private content"},
+                    "policy": "untrusted-policy",
+                },
+            ).status_code
+            == 400
+        )
+        reviewed = client.post(
+            "/v1/moderations",
+            json={"input": {"type": "text", "text": "hello"}, "policy": "review"},
+        )
+        assert reviewed.status_code == 200
+        assert reviewed.json()["decision"]["action"] == "review"
+        text = client.get("/metrics").text
+        assert (
+            sample(
+                text,
+                "modera_decisions_total",
+                {
+                    "input_type": "text",
+                    "policy": "review",
+                    "action": "review",
+                    "fallback": "false",
+                },
+            )
+            == 1
+        )
+        for action in ("allow", "block"):
+            assert (
+                sample(
+                    text,
+                    "modera_decisions_total",
+                    {
+                        "input_type": "text",
+                        "policy": "example",
+                        "action": action,
+                        "fallback": "false",
+                    },
+                )
+                == 1
+            )
+        assert (
+            sample(
+                text,
+                "modera_category_score_count",
+                {"input_type": "text", "category": "rules.term", "source": "rules"},
+            )
+            == 3
+        )
+        assert "untrusted-policy" not in text
+        assert "private content" not in text

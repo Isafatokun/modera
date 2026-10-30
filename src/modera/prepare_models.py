@@ -15,7 +15,6 @@ ARTIFACT_PATTERNS = ["*.json", "*.safetensors", "*.txt", "*.model"]
 
 def prepare_models(models: ModelConfig, *, threads: int, offline: bool) -> None:
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
-    os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     hub = importlib.import_module("huggingface_hub")
     for kind, selection in (("text", models.text), ("image", models.image)):
         if selection is None:

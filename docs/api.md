@@ -2,6 +2,9 @@
 
 `POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
+For the visual overview and caller responsibilities, start with
+[how Modera works](how-it-works.md).
+
 Configured backends return a policy decision. A modality with no model or rules
 backend returns `501 moderation_not_implemented`. See [model setup](models.md).
 
@@ -128,7 +131,7 @@ settings, label mappings, and rule configuration. See [fallback semantics](model
 | `413` | `payload_too_large`, `image_too_large` |
 | `415` | `unsupported_media_type`, `unsupported_content_encoding`, `unsupported_image_format`, `animated_image_not_supported` |
 | `422` | `input_too_long` (model token limit), `invalid_image` (undecodable data), `input_fetch_rejected` (source rejection, redirect, invalid response, or TLS failure) |
-| `500` | `internal_error`; no decision |
+| `500` | `internal_error`, `model_output_invalid`, `model_evaluation_failed`; non-retryable, no decision |
 | `501` | `moderation_not_implemented`; no backend configured, not retryable |
 | `503` | `service_not_ready`, `service_busy`, `queue_wait_timeout`, `image_processing_timeout`, `input_fetch_failed`, `check_unavailable`; retryable, `Retry-After: 1` |
 
