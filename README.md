@@ -64,6 +64,7 @@ curl http://127.0.0.1:8000/v1/moderations \
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `MODERA_API_KEY` | Required | Shared bearer API key; 32–512 printable ASCII characters, no spaces |
+| `MODERA_PREVIOUS_API_KEY` | Unset | Optional previous bearer key accepted during a bounded rotation window |
 | `MODERA_MAX_IN_FLIGHT_REQUESTS` | `8` | Maximum active HTTP moderation requests per process; excess requests rejected immediately |
 | `MODERA_IMAGE_QUEUE_SIZE` | `5` | Waiting photo jobs per processing stage; `0` rejects immediately when busy |
 | `MODERA_IMAGE_QUEUE_WAIT_SECONDS` | `2` | Maximum photo queue wait, within each stage's deadline |
@@ -77,8 +78,7 @@ curl http://127.0.0.1:8000/v1/moderations \
 Set variables through the shell or your deployment's secret manager. `.env` files
 are not loaded automatically. Missing/invalid keys and invalid policy files prevent
 startup. Generate a random key for each deployment; never commit it or embed it in
-browser/mobile code. Use HTTPS at the deployment ingress. Rotation requires replacing
-the secret and restarting instances and callers that use it.
+browser/mobile code. Use HTTPS at the deployment ingress. For rotation, see the [three-step key rotation guide](docs/operations.md#rotate-the-api-key).
 
 Model selections default to unset. Configure repository ID, pinned revision and label
 mapping; see [models, replacement, and rules fallback](docs/models.md). Classifier
@@ -96,8 +96,8 @@ Health checks need no credentials: `/health/live` checks HTTP availability;
 `/health/ready` checks readiness for the configured model/rules mode. Successful checks return
 `{"status":"ok"}`. Every application HTTP response includes `X-Request-ID`.
 
-`GET /metrics` exposes Prometheus request counts, latency, worker occupancy and queue
-depths. It requires the same bearer key. See [operations](docs/operations.md) for deployment
+`GET /metrics` exposes Prometheus request counts, latency, policy decisions, category
+scores, worker occupancy and queue depths. It requires the same bearer key. See [operations](docs/operations.md) for deployment
 and overload behavior.
 
 ## Container

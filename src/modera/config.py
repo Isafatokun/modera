@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
 
     api_key: SecretStr = Field(repr=False)
+    previous_api_key: SecretStr | None = Field(default=None, repr=False)
     docs_enabled: bool = False
     text_model: TextModelSettings | None = None
     image_model: ImageModelSettings | None = None
@@ -60,6 +61,19 @@ class Settings(BaseSettings):
                     "image hosts must be DNS names without wildcards, ports, or paths"
                 )
         return tuple(dict.fromkeys(host.lower() for host in hosts))
+
+    @field_validator("previous_api_key")
+    @classmethod
+    def validate_previous_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        return cls.validate_api_key(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def validate_key_rotation(self) -> Self:
+        if self.previous_api_key is not None and (
+            self.previous_api_key.get_secret_value() == self.api_key.get_secret_value()
+        ):
+            raise ValueError("current and previous API keys must differ")
+        return self
 
     @field_validator("api_key")
     @classmethod

@@ -30,6 +30,7 @@ services:
         condition: service_completed_successfully
     environment:
       MODERA_API_KEY: ${MODERA_API_KEY:?Export MODERA_API_KEY before starting}
+      MODERA_PREVIOUS_API_KEY:
       MODERA_MODEL_FILE: /etc/modera/models.json
       MODERA_POLICY_FILE: /etc/modera/policies.json
       MODERA_IMAGE_ALLOWED_HOSTS: ${MODERA_IMAGE_ALLOWED_HOSTS:-[]}
