@@ -1,5 +1,6 @@
 """Run the Go client's contract checks against the actual local rules-only API."""
 
+import json
 import os
 import secrets
 import socket
@@ -7,9 +8,11 @@ import subprocess
 import sys
 import tempfile
 import time
+from io import BytesIO
 from pathlib import Path
 
 import httpx2 as httpx
+from PIL import Image
 
 
 def main() -> None:
@@ -67,6 +70,68 @@ def main() -> None:
                 check=True,
                 timeout=60,
             )
+            with tempfile.TemporaryDirectory(prefix="modera-example-") as temporary:
+                binary = str(Path(temporary) / "moderate")
+                subprocess.run(
+                    ["go", "build", "-o", binary, "./cmd/moderate"],
+                    cwd=root / "clients/go",
+                    env=environment,
+                    check=True,
+                    timeout=60,
+                )
+                with BytesIO() as buffer, Image.new("RGB", (2, 2), "white") as image:
+                    image.save(buffer, format="PNG")
+                    photo = buffer.getvalue()
+                for args, content, status, disposition in [
+                    (["--policy", "rules-only"], b"hello", 0, "publish"),
+                    (
+                        ["--policy", "rules-only"],
+                        b"example prohibited phrase",
+                        3,
+                        "reject",
+                    ),
+                    (
+                        ["--policy", "rules-review"],
+                        b"example prohibited phrase",
+                        2,
+                        "review",
+                    ),
+                    (["--input", "image"], photo, 4, "pending"),
+                    (
+                        ["--input", "image-url"],
+                        b"https://unreachable.invalid/photo.png\n",
+                        4,
+                        "pending",
+                    ),
+                ]:
+                    result = subprocess.run(
+                        [
+                            binary,
+                            "--base-url",
+                            environment["MODERA_CHECK_BASE_URL"],
+                            *args,
+                        ],
+                        input=content,
+                        capture_output=True,
+                        env=environment,
+                        timeout=20,
+                    )
+                    output = json.loads(result.stdout)
+                    if (
+                        result.returncode != status
+                        or output["disposition"] != disposition
+                    ):
+                        raise RuntimeError(
+                            "Go application exit/disposition contract failed"
+                        )
+                    if disposition == "pending" and "result" in output:
+                        raise RuntimeError(
+                            "application error included a moderation decision"
+                        )
+                print(
+                    "Go application: publish/review/reject/pending "
+                    "and real image upload passed"
+                )
         finally:
             process.terminate()
             try:

@@ -6,8 +6,27 @@ coverage, rules provenance and fallback status. It creates no stored jobs or
 moderation actions. Go 1.23+ language compatibility; CI uses Go 1.27.3.
 
 The module lives at `github.com/Isafatokun/modera/clients/go`. It is not yet tagged.
-To consume an untagged revision from an application, use `go get` with the reviewed
-repository commit. Inside this checkout:
+To consume an untagged revision from an application, use `go get` with a reviewed
+repository commit. This installation was checked in a fresh external module:
+
+```sh
+go get github.com/Isafatokun/modera/clients/go@2a813900bf28e56efa9d04bbf5e5aec2a354dcd9
+```
+
+Go generates the pseudo-version; do not construct it manually. CI also installs
+each PR's exact head into a fresh consumer with no local replacement and compiles
+all three SDK methods. From the repository root, reproduce it with:
+
+```sh
+uv run --locked python clients/go/consumer_check.py --revision FULL_COMMIT_SHA
+```
+
+The declared minimum Go 1.23 language compatibility is checked separately from the
+current Go 1.27.3 race/static checks. Use a maintained Go release for deployment;
+the older toolchain job checks compatibility, not ongoing security support.
+
+A [runnable application example](cmd/moderate/README.md) handles text, photo stdin
+and image URLs with JSON dispositions and documented exit codes. Inside this checkout:
 
 ```sh
 cd clients/go

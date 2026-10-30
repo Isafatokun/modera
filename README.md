@@ -110,6 +110,10 @@ tracks disagreements, preserves uncertainty and exports sealed calibration/test
 labels. Its example inputs are synthetic; it does not supply independent human
 validation or select a production model automatically.
 
+For a runnable application using the SDK, see the
+[Go integration example](clients/go/cmd/moderate/README.md). It demonstrates
+publish/review/reject/pending handling, photo inputs, deadlines and safe error output.
+
 ## Roadmap
 
 Additional inference adapters, other client SDKs,

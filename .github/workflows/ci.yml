@@ -39,8 +39,31 @@ jobs:
       - name: Staticcheck Go client
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
         working-directory: clients/go
-      - name: Verify Go client against the local API
+      - name: Verify Go client and application against the local API
         run: uv run --locked python clients/go/integration.py
+      - name: Install SDK into an external consumer
+        run: >-
+          uv run --locked python clients/go/consumer_check.py
+          --revision "${{ github.event.pull_request.head.sha || github.sha }}"
+
+  go-minimum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - name: Verify declared minimum language compatibility
+        run: |
+          go version
+          go test ./...
+        working-directory: clients/go
 
   checks:
     runs-on: ubuntu-latest
@@ -56,7 +79,7 @@ jobs:
       - run: uv sync --locked --group benchmark
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy evaluation clients/go/integration.py
+      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy evaluation clients/go/integration.py clients/go/consumer_check.py
       - name: Check benchmark entry points
         run: |
           uv run --locked --group benchmark python benchmarks/run.py --help
