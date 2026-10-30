@@ -16,6 +16,13 @@
       "text": [
         {"category": "rules.prohibited_terms", "block_threshold": 1.0}
       ]
+    },
+    {
+      "id": "rules-review",
+      "version": "1",
+      "text": [
+        {"category": "rules.prohibited_terms", "review_threshold": 1.0}
+      ]
     }
   ]
 }

@@ -39,3 +39,29 @@ and guard experiments do not establish production-quality defaults. Genuine cate
 aligned independent review is still required. Reviewer IDs/origins and source novelty
 are declarations, not identity or training-independence verification. No real human
 labels were manufactured by the workflow tests or examples.
+
+## Go SDK release preparation
+
+Consumer compatibility and installation are separate checks. CI compiles the SDK
+and example with Go 1.23.12, runs race/static/live checks with Go 1.27.3, and installs
+the exact PR head into a fresh external module without a local `replace` directive.
+The [application example](../clients/go/cmd/moderate/README.md) demonstrates decisions
+and failures without performing application business actions.
+
+Before tagging the SDK:
+
+- Include the chosen repository licence files; none have been selected here.
+- Confirm all exact-revision checks and review the public API and limitations.
+- Use a submodule-prefixed tag, for example `clients/go/v0.1.0`, rather than a root
+  `v0.1.0` tag. The module lives under `clients/go`; see the
+  [Go module mapping rules](https://go.dev/ref/mod#vcs-version).
+- From a new consumer, install the tagged module, compile the three methods and
+  run the live application example against the release service configuration.
+- Publish SDK compatibility notes separately from service deployment evidence and
+  classifier accuracy. Do not describe an experimental model profile as approved.
+
+No version tag or release is created by these checks. The SDK's untagged revision
+can already be installed by commit; Go generates its pseudo-version. Language
+compatibility with Go 1.23 does not imply it still receives upstream security fixes;
+use a maintained toolchain for deployment (see the
+[Go release policy](https://go.dev/doc/devel/release#policy)).
