@@ -14,3 +14,7 @@ Before pushing code, perform and record separate review passes:
 Do not call code production-ready or world-class merely because tests pass.
 Distinguish software correctness from moderation accuracy and deployment evidence.
 Wait for required CI checks on the exact revision before merging.
+
+When publishing through file APIs, verify the created remote Git tree SHA matches
+exactly the reviewed local tree before updating the branch. Reject truncated
+transfer output; local test results apply only to identical published contents.

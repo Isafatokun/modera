@@ -79,7 +79,9 @@ the platform's termination grace period above that, for example 45 seconds, and
 remove the instance from ingress routing before termination. Native inference
 cannot be forcibly cancelled by this timeout; the platform must enforce the final
 process termination deadline. An interrupted request has no saved result and may
-need retrying against another instance.
+need retrying against another instance. Uvicorn re-raises the shutdown signal
+after cleanup; process exit alone does not prove that native work or an accepted
+request completed. Verify the response when testing successful draining.
 
 Reproduce the process checks with:
 
@@ -97,5 +99,8 @@ docker build --build-arg INFERENCE=true -t modera:smoke .
 MODERA_TEST_CONTAINER_IMAGE=modera:smoke uv run --locked --extra inference pytest tests/integration/test_container.py -q
 ```
 
-CI runs both checks. Ingress behavior and platform termination still need target
-deployment testing.
+CI runs both checks. The [gateway and lifecycle rehearsal](../deploy/rehearsal/README.md)
+adds the Go SDK, two real-model processes, NGINX removal/reload, overload/retry,
+active-request draining and an enforced final termination deadline. Its workflow
+retains evidence. Ingress behavior and termination still need testing on the
+chosen hosting platform.
