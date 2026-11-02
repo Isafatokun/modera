@@ -71,3 +71,6 @@ adjudicate disagreements and export category-specific calibration manifests.
 For paired classifier, detector and combined image policies, see
 [image comparison](image-comparison.md). It uses the same held-out case IDs and
 retains failed checks; it does not supply labelled photos or choose thresholds.
+
+See the [UnsafeBench recovery checkpoint](unsafebench-checkpoint.md) for the
+recorded photo comparison, its recovery limits and the separate calibration inputs.
