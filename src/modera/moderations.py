@@ -126,6 +126,26 @@ async def validate_upload(request: Request) -> tuple[str, bytes]:
         await form.close()
 
 
+def require_backend(
+    request: Request, engine: ModerationEngine | None, input_type: InputType
+) -> ModerationEngine:
+    if engine is None or not request.app.state.ready:
+        raise APIError(
+            503,
+            "service_not_ready",
+            "The service is not ready.",
+            retryable=True,
+            headers={"Retry-After": "1"},
+        )
+    if not engine.enabled(input_type):
+        raise APIError(
+            501,
+            "moderation_not_implemented",
+            "No moderation backend is configured for this input.",
+        )
+    return engine
+
+
 @router.post(
     "/moderations",
     status_code=200,
@@ -224,7 +244,10 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
             )
         if not isinstance(resolved.content, str):
             raise TypeError("URL input must contain a URL string")
-        image_data = await downloader.fetch(HttpUrl(resolved.content))
+        url = HttpUrl(resolved.content)
+        downloader.check_allowed(url)
+        require_backend(request, engine, input_type)
+        image_data = await downloader.fetch(url)
     elif resolved.source is InputSource.IMAGE_UPLOAD:
         if not isinstance(resolved.content, bytes):
             raise TypeError("uploaded input must contain bytes")
@@ -251,20 +274,7 @@ async def moderate(request: Request, response: Response) -> ModerationResult:
                 exc.param = "input.source.url"
             raise
         del image_data
-    if engine is None or not request.app.state.ready:
-        raise APIError(
-            503,
-            "service_not_ready",
-            "The service is not ready.",
-            retryable=True,
-            headers={"Retry-After": "1"},
-        )
-    if not engine.enabled(input_type):
-        raise APIError(
-            501,
-            "moderation_not_implemented",
-            "No moderation backend is configured for this input.",
-        )
+    engine = require_backend(request, engine, input_type)
     policy = resolve_policy(request.app.state.policies, policy_name, input_type)
     result = await engine.evaluate(
         input_type, content, policy, request.state.request_id
