@@ -1,9 +1,9 @@
 import asyncio
 from collections import deque
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from modera.errors import APIError
 
@@ -85,18 +85,33 @@ class BoundedWorker:
     async def run[T](self, operation: Callable[[], T]) -> T:
         await self._acquire()
         loop = asyncio.get_running_loop()
+        outcome: asyncio.Future[T] = loop.create_future()
+
+        def finish(value: T | None, error: BaseException | None) -> None:
+            self._release()
+            if outcome.cancelled():
+                return
+            if error is not None:
+                outcome.set_exception(error)
+            else:
+                outcome.set_result(cast(T, value))
+
+        def work() -> None:
+            value: T | None = None
+            error: BaseException | None = None
+            try:
+                value = operation()
+            except BaseException as exc:
+                error = exc
+            with suppress(RuntimeError):
+                loop.call_soon_threadsafe(finish, value, error)
+
         try:
-            future = self._executor.submit(operation)
+            self._executor.submit(work)
         except BaseException:
             self._release()
             raise
-
-        def completed(_future: Future[T]) -> None:
-            with suppress(RuntimeError):
-                loop.call_soon_threadsafe(self._release)
-
-        future.add_done_callback(completed)
-        return await asyncio.wrap_future(future)
+        return await outcome
 
     def close(self) -> None:
         self._closed = True

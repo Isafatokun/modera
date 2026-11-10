@@ -87,7 +87,7 @@ Scores are binary: 1 for a match, 0 otherwise, not probabilities. Results identi
 `source: "rules"`, `rules_version`, and only the coverage actually evaluated.
 
 Fallback defaults to errors. To explicitly permit a reduced rules-only policy when
-text inference is temporarily unavailable, busy, times out, or cannot load:
+text inference is unavailable, times out, or cannot load:
 
 ```sh
 export MODERA_TEXT_RULES_FILE=examples/text-rules.json
@@ -99,8 +99,10 @@ The fallback policy must contain only configured rule categories. Its actual ID 
 version appear in `policy`, alongside `fallback: true` and `models: []`. This setting
 applies to all text requests when inference is unavailable. Without an explicit
 fallback policy, the requested policy still applies: missing model checks return
-`503`, even if no rule matched. Invalid input, invalid model output and internal inference errors never trigger
-model fallback.
+`503`, even if no rule matched. A busy text worker is load, not an outage: it
+returns `503 service_busy` with `Retry-After` and never triggers fallback, so retry
+instead. Invalid input, invalid model output and internal inference errors never
+trigger model fallback.
 Readiness permits unavailable cached text weights or missing inference dependencies
 only when rules fallback is explicitly enabled. Invalid classifier configuration
 (including label mappings) and photo-model startup failures remain fatal. Restart to
