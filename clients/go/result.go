@@ -77,83 +77,137 @@ type Result struct {
 	PreprocessingVersion string         `json:"preprocessing_version"`
 }
 
+var errInvalidResult = errors.New("modera: invalid moderation result")
+
 func (r *Result) validate(kind string) error {
-	bad := errors.New("modera: invalid moderation result")
+	if !r.validEnvelope(kind) || !r.validAction() {
+		return errInvalidResult
+	}
+	evaluated, ok := r.evaluatedCategories()
+	if !ok || !r.validFindings(evaluated) || !r.hasProvenance() || !r.validReasons(evaluated) || !r.validMatchedRules() {
+		return errInvalidResult
+	}
+	models, ok := r.modelIDs()
+	if !ok || !r.validAttribution(models) {
+		return errInvalidResult
+	}
+	return nil
+}
+
+func (r *Result) validEnvelope(kind string) bool {
 	if !requestPattern.MatchString(r.RequestID) || r.InputType != kind || !policyPattern.MatchString(r.Policy.ID) || !plain(r.Policy.Version, 128) || !plain(r.PreprocessingVersion, 128) {
-		return bad
+		return false
 	}
-	if r.Decision.Action != "allow" && r.Decision.Action != "review" && r.Decision.Action != "block" {
-		return bad
+	return r.RulesVersion == nil || plain(*r.RulesVersion, 128)
+}
+
+func (r *Result) validAction() bool {
+	switch r.Decision.Action {
+	case "allow", "review", "block":
+	default:
+		return false
 	}
-	if (r.Decision.Action == "allow") != (len(r.Decision.Reasons) == 0) {
-		return bad
-	}
-	if r.RulesVersion != nil && !plain(*r.RulesVersion, 128) {
-		return bad
-	}
+	return (r.Decision.Action == "allow") == (len(r.Decision.Reasons) == 0)
+}
+
+func (r *Result) hasRules() bool {
+	return r.RulesVersion != nil && *r.RulesVersion != ""
+}
+
+// evaluatedCategories checks that the coverage lists are disjoint, well formed
+// and non-empty, and returns the evaluated categories.
+func (r *Result) evaluatedCategories() (map[string]bool, bool) {
 	if len(r.Coverage.Evaluated) == 0 || len(r.Findings) == 0 {
-		return bad
+		return nil, false
 	}
-	coverage := map[string]bool{}
-	evaluated := map[string]bool{}
+	seen := map[string]bool{}
 	for _, list := range [][]string{r.Coverage.Evaluated, r.Coverage.Unsupported, r.Coverage.NotApplicable} {
 		for _, category := range list {
-			if !categoryPattern.MatchString(category) || coverage[category] {
-				return bad
+			if !categoryPattern.MatchString(category) || seen[category] {
+				return nil, false
 			}
-			coverage[category] = true
+			seen[category] = true
 		}
 	}
+	evaluated := map[string]bool{}
 	for _, category := range r.Coverage.Evaluated {
 		evaluated[category] = true
 	}
+	return evaluated, true
+}
+
+// validFindings requires exactly one finding per evaluated category, each with a
+// finite score from 0 to 1. A finding with no source is treated as a model finding.
+func (r *Result) validFindings(evaluated map[string]bool) bool {
 	findings := map[string]bool{}
 	for i, f := range r.Findings {
 		if !evaluated[f.Category] || findings[f.Category] || math.IsNaN(f.Score) || math.IsInf(f.Score, 0) || f.Score < 0 || f.Score > 1 {
-			return bad
+			return false
 		}
 		if f.Source == "" {
 			r.Findings[i].Source = "model"
 			f.Source = "model"
 		}
-		if (f.Source != "model" && f.Source != "rules") || (f.Source == "model" && len(r.Models) == 0) || (f.Source == "rules" && (r.RulesVersion == nil || *r.RulesVersion == "")) {
-			return bad
+		if (f.Source != "model" && f.Source != "rules") || (f.Source == "model" && len(r.Models) == 0) || (f.Source == "rules" && !r.hasRules()) {
+			return false
 		}
 		findings[f.Category] = true
 	}
-	if len(findings) != len(evaluated) || (len(r.Models) == 0 && (r.RulesVersion == nil || *r.RulesVersion == "")) || (r.Fallback && (r.RulesVersion == nil || *r.RulesVersion == "")) {
-		return bad
+	return len(findings) == len(evaluated)
+}
+
+func (r *Result) hasProvenance() bool {
+	if len(r.Models) == 0 && !r.hasRules() {
+		return false
 	}
+	return !r.Fallback || r.hasRules()
+}
+
+func (r *Result) validReasons(evaluated map[string]bool) bool {
 	reasons := map[string]bool{}
 	for _, category := range r.Decision.Reasons {
 		if !evaluated[category] || reasons[category] {
-			return bad
+			return false
 		}
 		reasons[category] = true
 	}
-	matchedRules := map[string]bool{}
+	return true
+}
+
+func (r *Result) validMatchedRules() bool {
+	matched := map[string]bool{}
 	for _, rule := range r.Decision.MatchedRules {
-		if !categoryPattern.MatchString(rule) || matchedRules[rule] || r.Decision.Action == "allow" {
-			return bad
+		if !categoryPattern.MatchString(rule) || matched[rule] || r.Decision.Action == "allow" {
+			return false
 		}
-		matchedRules[rule] = true
+		matched[rule] = true
 	}
+	return true
+}
+
+func (r *Result) modelIDs() (map[string]bool, bool) {
 	models := map[string]bool{}
 	for _, model := range r.Models {
 		if !plain(model.ID, 200) || !plain(model.Revision, 128) || models[model.ID] {
-			return bad
+			return nil, false
 		}
 		models[model.ID] = true
 	}
+	return models, true
+}
+
+// validAttribution checks that findings only name listed models and that, with
+// several models, every model finding says which one produced it.
+func (r *Result) validAttribution(models map[string]bool) bool {
 	for _, finding := range r.Findings {
 		if finding.Model != "" && (finding.Source != "model" || !models[finding.Model]) {
-			return bad
+			return false
 		}
 		if len(models) > 1 && finding.Source == "model" && finding.Model == "" {
-			return bad
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
 func plain(value string, maximum int) bool {
