@@ -16,6 +16,7 @@ from modera.model_config import (
     ImageModelSettings,
     ImageSettings,
     OnnxDetectorSettings,
+    PinnedModelSettings,
     TextModelSettings,
 )
 from modera.results import Finding
@@ -43,6 +44,51 @@ class ModelAdapter(Protocol):
     def predict(self, content: str | bytes | PreparedImage) -> list[Finding]: ...
 
 
+LOADING_PROBLEMS = ("missing_keys", "unexpected_keys", "mismatched_keys", "error_msgs")
+
+
+def hub_options(settings: PinnedModelSettings) -> dict[str, Any]:
+    return {
+        "revision": settings.revision,
+        "cache_dir": str(settings.cache_dir) if settings.cache_dir else None,
+        "local_files_only": True,
+        "trust_remote_code": False,
+    }
+
+
+def load_pretrained(
+    loader: Any,
+    settings: PinnedModelSettings,
+    options: dict[str, Any],
+    torch: Any,
+    architecture: str,
+) -> Any:
+    model, loading = loader.from_pretrained(
+        settings.id,
+        **options,
+        use_safetensors=True,
+        dtype=torch.float32,
+        output_loading_info=True,
+    )
+    if any(loading.get(key) for key in LOADING_PROBLEMS):
+        raise ValueError(f"checkpoint does not match the {architecture} architecture")
+    model.eval()
+    return model
+
+
+def label_indices(
+    model: Any, settings: TextModelSettings | ImageModelSettings
+) -> dict[str, int]:
+    labels = model.config.id2label
+    if set(labels) != set(range(model.config.num_labels)) or not set(
+        settings.label_map
+    ) <= set(labels.values()):
+        raise ValueError("label mappings do not match the model outputs")
+    if settings.activation == "softmax" and len(labels) < 2:
+        raise ValueError("softmax requires at least two labels")
+    return {label: index for index, label in labels.items()}
+
+
 class Classifier:
     def __init__(
         self, settings: TextModelSettings | ImageModelSettings, threads: int
@@ -57,64 +103,43 @@ class Classifier:
         self.settings = settings
         self.categories = frozenset(settings.label_map.values())
         self._label_map = dict(settings.label_map)
-        options = {
-            "revision": settings.revision,
-            "cache_dir": str(settings.cache_dir) if settings.cache_dir else None,
-            "local_files_only": True,
-            "trust_remote_code": False,
-        }
-        is_text = isinstance(settings, TextModelSettings)
+        options = hub_options(settings)
         loader = (
             transformers.AutoModelForSequenceClassification
-            if is_text
+            if isinstance(settings, TextModelSettings)
             else transformers.AutoModelForImageClassification
         )
-        self._model: Any = loader.from_pretrained(
-            settings.id,
-            **options,
-            use_safetensors=True,
-            dtype=self._torch.float32,
-            output_loading_info=True,
+        self._model: Any = load_pretrained(
+            loader, settings, options, self._torch, "classifier"
         )
-        self._model, loading = self._model
-        if any(
-            loading.get(key)
-            for key in (
-                "missing_keys",
-                "unexpected_keys",
-                "mismatched_keys",
-                "error_msgs",
-            )
-        ):
-            raise ValueError("checkpoint does not match the classifier architecture")
-        self._model.eval()
-        labels = self._model.config.id2label
-        if set(labels) != set(range(self._model.config.num_labels)) or not set(
-            self._label_map
-        ) <= set(labels.values()):
-            raise ValueError("label mappings do not match the model outputs")
-        if settings.activation == "softmax" and len(labels) < 2:
-            raise ValueError("softmax requires at least two labels")
-        self._indices = {label: index for index, label in labels.items()}
+        self._indices = label_indices(self._model, settings)
         if isinstance(settings, TextModelSettings):
-            self._processor = transformers.AutoTokenizer.from_pretrained(
-                settings.id, **options
-            )
-            self._max_tokens = min(
-                settings.max_tokens,
-                self._processor.model_max_length,
-                getattr(
-                    self._model.config, "max_position_embeddings", settings.max_tokens
-                ),
-            )
-            self.predict("Warmup")
+            self._load_text(transformers, options, settings)
         else:
-            self._processor = transformers.AutoImageProcessor.from_pretrained(
-                settings.id, **options, backend="pil"
-            )
-            with BytesIO() as buffer, Image.new("RGB", (2, 2), "white") as image:
-                image.save(buffer, format="PNG")
-                self.predict(buffer.getvalue())
+            self._load_image(transformers, options, settings)
+
+    def _load_text(
+        self, transformers: Any, options: dict[str, Any], settings: TextModelSettings
+    ) -> None:
+        self._processor = transformers.AutoTokenizer.from_pretrained(
+            settings.id, **options
+        )
+        self._max_tokens = min(
+            settings.max_tokens,
+            self._processor.model_max_length,
+            getattr(self._model.config, "max_position_embeddings", settings.max_tokens),
+        )
+        self.predict("Warmup")
+
+    def _load_image(
+        self, transformers: Any, options: dict[str, Any], settings: ImageModelSettings
+    ) -> None:
+        self._processor = transformers.AutoImageProcessor.from_pretrained(
+            settings.id, **options, backend="pil"
+        )
+        with BytesIO() as buffer, Image.new("RGB", (2, 2), "white") as image:
+            image.save(buffer, format="PNG")
+            self.predict(buffer.getvalue())
 
     def prepare_image(self, image: Image.Image) -> PreparedImage:
         if not isinstance(self.settings, ImageModelSettings):
@@ -181,30 +206,14 @@ class Detector:
         self._torch = importlib.import_module("torch")
         transformers = importlib.import_module("transformers")
         self._torch.set_num_threads(threads)
-        options = {
-            "revision": settings.revision,
-            "cache_dir": str(settings.cache_dir) if settings.cache_dir else None,
-            "local_files_only": True,
-            "trust_remote_code": False,
-        }
-        self._model, loading = transformers.AutoModelForObjectDetection.from_pretrained(
-            settings.id,
-            **options,
-            use_safetensors=True,
-            dtype=self._torch.float32,
-            output_loading_info=True,
+        options = hub_options(settings)
+        self._model = load_pretrained(
+            transformers.AutoModelForObjectDetection,
+            settings,
+            options,
+            self._torch,
+            "detector",
         )
-        if any(
-            loading.get(key)
-            for key in (
-                "missing_keys",
-                "unexpected_keys",
-                "mismatched_keys",
-                "error_msgs",
-            )
-        ):
-            raise ValueError("checkpoint does not match the detector architecture")
-        self._model.eval()
         self._labels = dict(self._model.config.id2label)
         if not set(settings.label_map) <= set(self._labels.values()):
             raise ValueError("label mappings do not match detector outputs")
