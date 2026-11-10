@@ -181,11 +181,7 @@ class ModerationEngine:
         policy: Policy,
         request_id: str,
     ) -> ModerationResult:
-        selections: tuple[TextModelSettings | ImageSettings, ...] = (
-            self._settings.configured_image_models
-            if input_type == IMAGE
-            else ((self._settings.text_model,) if self._settings.text_model else ())
-        )
+        selections = self._selections(input_type)
         rules = self._rules if input_type == TEXT else None
         findings = (
             rules.evaluate(content)
@@ -195,7 +191,42 @@ class ModerationEngine:
         capabilities = {finding.category for finding in findings}
         for selection in selections:
             capabilities.update(selection.label_map.values())
-        needed = policy.categories_for(input_type)
+        needed = self._require_applicable(policy, input_type, capabilities)
+        model_findings, models, fallback = await self._run_models(
+            input_type, selections, needed, content
+        )
+        findings.extend(model_findings)
+        if fallback and self._fallback_policy is not None:
+            policy = self._fallback_policy
+        coverage = Coverage(
+            evaluated=[finding.category for finding in findings],
+            unsupported=sorted(policy.categories_for(input_type) - capabilities),
+            not_applicable=[],
+        )
+        return ModerationResult(
+            request_id=request_id,
+            input_type=input_type,
+            policy=PolicyVersion(id=policy.id, version=policy.version),
+            decision=evaluate_policy(policy, input_type, findings, coverage),
+            findings=findings,
+            coverage=coverage,
+            models=models,
+            rules_version=rules.version if rules else None,
+            fallback=fallback,
+            preprocessing_version=self._versions[input_type],
+        )
+
+    def _selections(
+        self, input_type: InputType
+    ) -> tuple[TextModelSettings | ImageSettings, ...]:
+        if input_type == IMAGE:
+            return self._settings.configured_image_models
+        return (self._settings.text_model,) if self._settings.text_model else ()
+
+    @staticmethod
+    def _require_applicable(
+        policy: Policy, input_type: InputType, capabilities: set[str]
+    ) -> frozenset[str]:
         if policy.categories_for(input_type, required_only=True) - capabilities:
             raise APIError(
                 400,
@@ -203,6 +234,7 @@ class ModerationEngine:
                 "A required policy check cannot evaluate this input.",
                 param="policy",
             )
+        needed = policy.categories_for(input_type)
         if not needed.intersection(capabilities):
             raise APIError(
                 400,
@@ -210,6 +242,16 @@ class ModerationEngine:
                 "No policy checks apply to this input.",
                 param="policy",
             )
+        return needed
+
+    async def _run_models(
+        self,
+        input_type: InputType,
+        selections: tuple[TextModelSettings | ImageSettings, ...],
+        needed: frozenset[str],
+        content: str | bytes | PreparedImage,
+    ) -> tuple[list[Finding], list[ModelVersion], bool]:
+        findings: list[Finding] = []
         models: list[ModelVersion] = []
         fallback = False
         try:
@@ -222,51 +264,19 @@ class ModerationEngine:
                 for selection in selections:
                     if not needed.intersection(selection.label_map.values()):
                         continue
-                    adapter = (
-                        self._image_adapters.get(selection.id)
-                        if input_type == IMAGE
-                        else self._text
-                    )
-                    worker = (
-                        self._image_workers[selection.id]
-                        if input_type == IMAGE
-                        else self._workers[TEXT]
-                    )
                     try:
-                        if adapter is None:
-                            raise APIError(
-                                503,
-                                "check_unavailable",
-                                "The model is unavailable.",
-                                retryable=True,
-                                headers={"Retry-After": "1"},
+                        findings.extend(
+                            await self._run_model(
+                                input_type, selection, content, len(selections) > 1
                             )
-                        operation = partial(adapter.predict, content)
-                        if len(selections) > 1:
-                            operation = partial(
-                                self._predict_image, adapter, content, selection
-                            )
-                        model_findings = await worker.run(operation)
-                        if len(selections) > 1:
-                            model_findings = [
-                                finding.model_copy(update={"model": selection.id})
-                                for finding in model_findings
-                            ]
-                        findings.extend(model_findings)
+                        )
                         models.append(
                             ModelVersion(id=selection.id, revision=selection.revision)
                         )
                     except APIError as exc:
-                        if (
-                            input_type != TEXT
-                            or self._settings.text_fallback != "rules"
-                            or exc.status_code != 503
-                            or exc.code != "check_unavailable"
-                        ):
+                        if not self._falls_back(input_type, exc):
                             raise
                         fallback = True
-                        if self._fallback_policy is not None:
-                            policy = self._fallback_policy
         except TimeoutError as exc:
             raise APIError(
                 503,
@@ -275,23 +285,46 @@ class ModerationEngine:
                 retryable=True,
                 headers={"Retry-After": "1"},
             ) from exc
-        coverage = Coverage(
-            evaluated=[finding.category for finding in findings],
-            unsupported=sorted(policy.categories_for(input_type) - capabilities),
-            not_applicable=[],
+        return findings, models, fallback
+
+    async def _run_model(
+        self,
+        input_type: InputType,
+        selection: TextModelSettings | ImageSettings,
+        content: str | bytes | PreparedImage,
+        attribute: bool,
+    ) -> list[Finding]:
+        adapter = (
+            self._image_adapters.get(selection.id)
+            if input_type == IMAGE
+            else self._text
         )
-        decision = evaluate_policy(policy, input_type, findings, coverage)
-        return ModerationResult(
-            request_id=request_id,
-            input_type=input_type,
-            policy=PolicyVersion(id=policy.id, version=policy.version),
-            decision=decision,
-            findings=findings,
-            coverage=coverage,
-            models=models,
-            rules_version=rules.version if rules else None,
-            fallback=fallback,
-            preprocessing_version=self._versions[input_type],
+        worker = (
+            self._image_workers[selection.id]
+            if input_type == IMAGE
+            else self._workers[TEXT]
+        )
+        if adapter is None:
+            raise APIError(
+                503,
+                "check_unavailable",
+                "The model is unavailable.",
+                retryable=True,
+                headers={"Retry-After": "1"},
+            )
+        if not attribute:
+            return await worker.run(partial(adapter.predict, content))
+        found = await worker.run(
+            partial(self._predict_image, adapter, content, selection)
+        )
+        return [finding.model_copy(update={"model": selection.id}) for finding in found]
+
+    def _falls_back(self, input_type: InputType, error: APIError) -> bool:
+        return (
+            input_type == TEXT
+            and self._settings.text_fallback == "rules"
+            and error.status_code == 503
+            and error.code == "check_unavailable"
         )
 
     @staticmethod
