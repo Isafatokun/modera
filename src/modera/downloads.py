@@ -73,7 +73,7 @@ class ImageDownloader:
     async def close(self) -> None:
         self._closed = True
 
-    async def fetch(self, url: HttpUrl) -> bytes:
+    def check_allowed(self, url: HttpUrl) -> None:
         if (
             url.scheme != "https"
             or url.host not in self._allowed_hosts
@@ -84,6 +84,9 @@ class ImageDownloader:
                 "image_url_not_allowed",
                 "The image URL destination is not allowed.",
             )
+
+    async def fetch(self, url: HttpUrl) -> bytes:
+        self.check_allowed(url)
         if self._closed or self._active >= MAX_DOWNLOADS:
             raise source_error(
                 503,
