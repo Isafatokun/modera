@@ -36,7 +36,7 @@ curl http://127.0.0.1:8000/v1/moderations \
 ```
 
 Uploads need no URL allowlist. To fetch remote photos, allow the host as described in
-the [reference setup](../deploy/reference/README.md#url-and-unavailable-source-checks).
+the [reference setup](../deploy/reference/README.md#url-checks).
 
 ## Reading the response
 

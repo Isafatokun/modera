@@ -1,12 +1,9 @@
 # Capacity benchmark
 
-Manual HTTP measurements, separate from the correctness tests in `tests/`.
-Runs on Linux/macOS with the pinned example Horizon text and ViT photo classifiers,
-FP32 CPU inference, one server process, and two threads per model operation. Text
-and photo inference each have one slot, sharing the host's CPU and memory. It starts a
-loopback server with an ephemeral key; it does not target an existing deployment.
-
-From the repository root:
+Manual HTTP measurements, separate from the tests. It starts a loopback server with a
+throwaway key on Linux or macOS using the example Horizon text and ViT photo
+classifiers, FP32 on CPU, one process and two threads per model. It cannot target an
+existing deployment.
 
 ```sh
 uv sync --locked --extra inference --group benchmark
@@ -14,31 +11,28 @@ uv run --locked --extra inference --group benchmark python benchmarks/prepare_mo
 uv run --locked --extra inference --group benchmark python benchmarks/run.py --cache /tmp/modera-model-cache --seconds 20
 ```
 
-Preparation downloads about 0.9 GiB of pinned weights. The benchmark service loads
-them locally with network model loading disabled. Model IDs, revisions, mappings,
-and the workload matrix are explicit in the scripts; no deployment settings or
-credentials are inherited from `MODERA_*` variables.
+Preparation downloads about 0.9 GiB of pinned weights, and the benchmark then loads them
+offline. Model IDs, revisions and the workload are fixed in the scripts, and no
+`MODERA_*` settings or credentials are inherited.
 
-The workload covers short/long text, generated 3 MP/12 MP JPEG uploads, mixed
-traffic, paced load, and unpaced eight-client bursts. Requests are never retried.
-Each scenario starts requests for the configured duration; outstanding requests
-and pacing sleeps can extend its wall time. The generator is closed-loop: paced
-workers can fall below their target rate when requests are slow.
+The workloads are short and long text, generated 3 MP and 12 MP JPEG uploads, mixed
+traffic, paced load and unpaced bursts of eight clients. Requests are never retried.
+The generator is closed loop, so paced workers fall below their target rate when
+requests are slow, and in-flight requests can stretch a scenario's wall time.
 
-Each run creates a unique ignored directory under `benchmarks/results/`. Use
-`--output /path/to/new-directory` to choose another location; existing directories
-are rejected. Outputs include the commit/dirty state, dependency versions, model
-provenance from successful warm-ups, fixtures, raw latency samples, status/error
-counts, health probes, metrics, peak server memory, and a final recovery request.
-Interrupted runs retain completed scenarios and are marked `interrupted`.
+Each run writes to a new ignored directory under `benchmarks/results/`, or to
+`--output`, which must not exist. It records the commit and dirty state, dependency
+versions, model provenance, fixtures, raw latency samples, status and error counts,
+health probes, metrics, peak server memory and a final recovery request. An interrupted
+run keeps its finished scenarios and is marked `interrupted`.
 
-Successful-request throughput and latency are separate from rejected/failed
-requests. Peak RSS is a process high-water mark, not steady memory or container
-usage. Synthetic images test processing costs, not moderation accuracy. Short
-runs and small samples do not establish tail latency or production capacity.
+Successful throughput and latency are reported apart from rejected or failed requests.
+Peak RSS is a high-water mark, not steady-state or container memory. The images are
+synthetic, so this measures processing cost, not moderation accuracy, and short runs
+say little about tail latency. Compare runs only on the same commit, models, workload
+and hardware, and save the result JSON with any published claim.
 
-Use the same commit, models, workload, and hardware for comparisons; save the
-result JSON alongside any published claims. For deployment sizing, also use a
-separate generator, representative media, longer arrival-rate/soak tests, ingress
-limits, and caller retry behavior. Normal CI lints/type-checks these scripts and
-checks their entry points; it does not download weights or enforce timing targets.
+For deployment sizing, add a separate load generator, representative media, longer
+arrival-rate and soak tests, your ingress limits and your callers' retry behaviour. CI
+lints and type-checks these scripts and runs their `--help`, but downloads no weights and
+enforces no timing targets.
