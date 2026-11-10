@@ -149,4 +149,4 @@ the documentation pages need no key.
 When multiple image models are configured, model findings also contain `model`,
 matching an ID in `models`. Triggered composite rules contributing to the selected
 action appear in `decision.matched_rules`; reasons remain category names. These
-fields are omitted when unused. See [combining models](combining-models.md).
+fields are omitted when unused. See [combining models](image-models.md#combine-image-models).
