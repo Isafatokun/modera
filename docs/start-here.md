@@ -4,7 +4,7 @@ Choose what you want to try. Both paths bind the API to your own machine.
 
 | Goal | Start with | Requirements |
 | --- | --- | --- |
-| Learn requests and decisions | [Text rules demo](../README.md#run) | Python 3.12 and uv; no model download |
+| Learn requests and decisions | [Text rules demo](../README.md#quick-start) | Python 3.12 and uv; no model download |
 | Run real text and photo models | [Docker Compose setup](../deploy/reference/README.md) | Docker Compose v2; about 0.6 GiB of weights downloaded on first run |
 | Connect your backend | [Go example](../clients/go/README.md) or [API reference](api.md) | A running service and its bearer key |
 
