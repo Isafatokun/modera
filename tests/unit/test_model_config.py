@@ -135,8 +135,11 @@ def test_application_keeps_its_model_selection_snapshot(
         "MODERA_TEXT_MODEL__ID", "Horizon-Labs/multilingual-toxicity-small"
     )
     second = create_app()
-    assert first.state.text_model.id == "unitary/toxic-bert"
-    assert second.state.text_model.id == "Horizon-Labs/multilingual-toxicity-small"
+    assert first.state.settings.text_model.id == "unitary/toxic-bert"
+    assert (
+        second.state.settings.text_model.id
+        == "Horizon-Labs/multilingual-toxicity-small"
+    )
 
 
 @pytest.mark.parametrize("change", ["path", "digest", "order", "mapping", "channels"])
