@@ -27,10 +27,50 @@ from modera.results import (
     ModerationResult,
     PolicyVersion,
 )
-from modera.rules import load_rules
+from modera.rules import TextRules, load_rules
 from modera.workers import WorkerCapacity
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_fallback_policy(
+    settings: Settings, rules: TextRules | None, policies: Mapping[str, Policy]
+) -> Policy | None:
+    if settings.text_fallback == "rules" and rules is None:
+        raise ValueError("rules fallback requires a text rules file")
+    if settings.text_fallback_policy is None:
+        return None
+    policy = policies.get(settings.text_fallback_policy)
+    available = {rule.category for rule in rules.rules} if rules else set()
+    if (
+        settings.text_fallback != "rules"
+        or policy is None
+        or not policy.text
+        or any(rule.category not in available for rule in policy.text)
+    ):
+        raise ValueError("fallback policy must contain only configured text rules")
+    return policy
+
+
+def configuration_version(
+    kind: InputType, settings: Settings, rules: TextRules | None
+) -> str:
+    model = settings.text_model if kind == TEXT else settings.image_model
+    snapshot: dict[str, object] = {
+        "model": model.model_dump(mode="json", exclude={"cache_dir"})
+        if model
+        else None,
+        "rules": rules.model_dump(mode="json") if kind == TEXT and rules else None,
+    }
+    if kind == IMAGE and settings.image_models:
+        snapshot = {
+            "models": [
+                image.model_dump(mode="json", exclude={"cache_dir"})
+                for image in settings.image_models
+            ]
+        }
+    digest = hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
+    return f"{kind}-v1.{digest}"
 
 
 class ModerationEngine:
@@ -39,50 +79,11 @@ class ModerationEngine:
         self._settings = settings
         self._rules = load_rules(settings.text_rules_file)
         self._policies = policies
-        if settings.text_fallback == "rules" and self._rules is None:
-            raise ValueError("rules fallback requires a text rules file")
-        self._fallback_policy = None
-        if settings.text_fallback_policy is not None:
-            self._fallback_policy = policies.get(settings.text_fallback_policy)
-            available = (
-                {rule.category for rule in self._rules.rules} if self._rules else set()
-            )
-            if (
-                settings.text_fallback != "rules"
-                or self._fallback_policy is None
-                or not self._fallback_policy.text
-                or any(
-                    rule.category not in available
-                    for rule in self._fallback_policy.text
-                )
-            ):
-                raise ValueError(
-                    "fallback policy must contain only configured text rules"
-                )
-        self._versions = {}
-        for kind, model in (
-            (TEXT, settings.text_model),
-            (IMAGE, settings.image_model),
-        ):
-            snapshot: dict[str, object] = {
-                "model": model.model_dump(mode="json", exclude={"cache_dir"})
-                if model
-                else None,
-                "rules": self._rules.model_dump(mode="json")
-                if kind == TEXT and self._rules
-                else None,
-            }
-            if kind == IMAGE and settings.image_models:
-                snapshot = {
-                    "models": [
-                        model.model_dump(mode="json", exclude={"cache_dir"})
-                        for model in settings.image_models
-                    ]
-                }
-            digest = hashlib.sha256(
-                json.dumps(snapshot, sort_keys=True).encode()
-            ).hexdigest()
-            self._versions[kind] = f"{kind}-v1.{digest}"
+        self._fallback_policy = resolve_fallback_policy(settings, self._rules, policies)
+        self._versions = {
+            kind: configuration_version(kind, settings, self._rules)
+            for kind in (TEXT, IMAGE)
+        }
         self._text: ModelAdapter | None = None
         self._image: ModelAdapter | None = None
         self._workers = {
