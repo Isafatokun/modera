@@ -64,6 +64,85 @@ class PublicResolver(aiohttp.ThreadedResolver):
         return addresses
 
 
+RETRYABLE_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+
+
+def retry_after_seconds(value: str) -> int | None:
+    try:
+        if value.isascii() and value.isdecimal():
+            delay = int(value)
+        else:
+            remaining = parsedate_to_datetime(value) - datetime.now(UTC)
+            delay = int(remaining.total_seconds()) + 1
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return max(1, min(delay, 86400))
+
+
+def check_response(response: aiohttp.ClientResponse) -> None:
+    if response.status in RETRYABLE_STATUSES:
+        error = source_error(
+            503,
+            "input_fetch_failed",
+            "The image source is temporarily unavailable.",
+            retryable=True,
+        )
+        if value := response.headers.get("Retry-After"):
+            seconds = retry_after_seconds(value)
+            if seconds is not None:
+                error.headers = {"Retry-After": str(seconds)}
+        raise error
+    if response.status != 200:
+        raise source_error(
+            422,
+            "input_fetch_rejected",
+            "The image source did not return an image.",
+        )
+    if response.headers.get("Content-Encoding", "identity").lower() != "identity":
+        raise source_error(
+            415,
+            "unsupported_content_encoding",
+            "Encoded image responses are not supported.",
+        )
+    if (
+        response.content_length is not None
+        and response.content_length > MAX_IMAGE_BYTES
+    ):
+        raise source_error(413, "payload_too_large", "The image file is too large.")
+
+
+async def read_capped(response: aiohttp.ClientResponse) -> bytes:
+    data = bytearray()
+    async for chunk in response.content.iter_chunked(64 * 1024):
+        if len(data) + len(chunk) > MAX_IMAGE_BYTES:
+            raise source_error(413, "payload_too_large", "The image file is too large.")
+        data.extend(chunk)
+    return bytes(data)
+
+
+def new_session(resolver: PublicResolver) -> aiohttp.ClientSession:
+    return aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(
+            resolver=resolver,
+            use_dns_cache=False,
+            force_close=True,
+            limit=1,
+        ),
+        timeout=aiohttp.ClientTimeout(
+            total=ATTEMPT_SECONDS,
+            connect=STALL_SECONDS,
+            sock_read=STALL_SECONDS,
+        ),
+        trust_env=False,
+        auto_decompress=False,
+        cookie_jar=aiohttp.DummyCookieJar(),
+        headers={
+            "Accept-Encoding": "identity",
+            "Accept": "image/jpeg,image/png,image/webp",
+        },
+    )
+
+
 class ImageDownloader:
     def __init__(self, allowed_hosts: tuple[str, ...]) -> None:
         self._allowed_hosts = frozenset(allowed_hosts)
@@ -119,87 +198,14 @@ class ImageDownloader:
         raise RuntimeError("download attempts exhausted")
 
     async def _download(self, url: str) -> bytes:
-        timeout = aiohttp.ClientTimeout(
-            total=ATTEMPT_SECONDS,
-            connect=STALL_SECONDS,
-            sock_read=STALL_SECONDS,
-        )
         resolver = PublicResolver()
         try:
             async with (
-                aiohttp.ClientSession(
-                    connector=aiohttp.TCPConnector(
-                        resolver=resolver,
-                        use_dns_cache=False,
-                        force_close=True,
-                        limit=1,
-                    ),
-                    timeout=timeout,
-                    trust_env=False,
-                    auto_decompress=False,
-                    cookie_jar=aiohttp.DummyCookieJar(),
-                    headers={
-                        "Accept-Encoding": "identity",
-                        "Accept": "image/jpeg,image/png,image/webp",
-                    },
-                ) as session,
+                new_session(resolver) as session,
                 session.get(url, allow_redirects=False) as response,
             ):
-                if response.status in {408, 429, 500, 502, 503, 504}:
-                    error = source_error(
-                        503,
-                        "input_fetch_failed",
-                        "The image source is temporarily unavailable.",
-                        retryable=True,
-                    )
-                    if value := response.headers.get("Retry-After"):
-                        try:
-                            delay = (
-                                int(value)
-                                if value.isascii() and value.isdecimal()
-                                else int(
-                                    (
-                                        parsedate_to_datetime(value) - datetime.now(UTC)
-                                    ).total_seconds()
-                                )
-                                + 1
-                            )
-                            error.headers = {
-                                "Retry-After": str(max(1, min(delay, 86400)))
-                            }
-                        except (ValueError, TypeError, OverflowError):
-                            pass
-                    raise error
-                if response.status != 200:
-                    raise source_error(
-                        422,
-                        "input_fetch_rejected",
-                        "The image source did not return an image.",
-                    )
-                if (
-                    response.headers.get("Content-Encoding", "identity").lower()
-                    != "identity"
-                ):
-                    raise source_error(
-                        415,
-                        "unsupported_content_encoding",
-                        "Encoded image responses are not supported.",
-                    )
-                if (
-                    response.content_length is not None
-                    and response.content_length > MAX_IMAGE_BYTES
-                ):
-                    raise source_error(
-                        413, "payload_too_large", "The image file is too large."
-                    )
-                data = bytearray()
-                async for chunk in response.content.iter_chunked(64 * 1024):
-                    if len(data) + len(chunk) > MAX_IMAGE_BYTES:
-                        raise source_error(
-                            413, "payload_too_large", "The image file is too large."
-                        )
-                    data.extend(chunk)
-                return bytes(data)
+                check_response(response)
+                return await read_capped(response)
         except (aiohttp.ClientSSLError, aiohttp.InvalidURL) as exc:
             raise source_error(
                 422, "input_fetch_rejected", "The image source could not be verified."
