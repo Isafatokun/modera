@@ -68,6 +68,87 @@ def decode_proposals(output: Any, settings: OnnxDetectorSettings) -> list[Findin
     ]
 
 
+def load_artifact(settings: OnnxDetectorSettings) -> bytes:
+    hub = importlib.import_module("huggingface_hub")
+    filename = hub.hf_hub_download(
+        settings.id,
+        settings.filename,
+        revision=settings.revision,
+        cache_dir=settings.cache_dir,
+        local_files_only=True,
+    )
+    with open(filename, "rb") as source:
+        content = source.read(MAX_MODEL_BYTES + 1)
+    if (
+        len(content) > MAX_MODEL_BYTES
+        or hashlib.sha256(content).hexdigest() != settings.sha256
+    ):
+        raise ValueError("ONNX artifact size or digest does not match configuration")
+    onnx = importlib.import_module("onnx")
+    graph = onnx.load_model_from_string(content)
+    reject_external_data(graph)
+    onnx.checker.check_model(graph)
+    return content
+
+
+def create_session(content: bytes, threads: int) -> Any:
+    runtime = importlib.import_module("onnxruntime")
+    runtime.disable_telemetry_events()
+    options = runtime.SessionOptions()
+    options.intra_op_num_threads = threads
+    options.inter_op_num_threads = 1
+    options.execution_mode = runtime.ExecutionMode.ORT_SEQUENTIAL
+    options.log_severity_level = 4
+    return runtime.InferenceSession(
+        content,
+        sess_options=options,
+        providers=["CPUExecutionProvider"],
+    )
+
+
+def check_signature(session: Any, settings: OnnxDetectorSettings) -> None:
+    inputs = session.get_inputs()
+    outputs = session.get_outputs()
+    expected = [1, 3, settings.input_size, settings.input_size]
+    if (
+        len(inputs) != 1
+        or inputs[0].type != "tensor(float)"
+        or len(inputs[0].shape) != 4
+        or any(
+            isinstance(actual, int) and actual != wanted
+            for actual, wanted in zip(inputs[0].shape, expected, strict=True)
+        )
+    ):
+        raise ValueError("ONNX detector input shape does not match configuration")
+    if len(outputs) != 1 or outputs[0].type != "tensor(float)":
+        raise ValueError("ONNX detector requires one float32 proposal output")
+    shape = outputs[0].shape
+    if (
+        len(shape) != 3
+        or (isinstance(shape[0], int) and shape[0] != 1)
+        or (isinstance(shape[1], int) and shape[1] != len(settings.labels) + 4)
+        or (isinstance(shape[2], int) and shape[2] > MAX_PROPOSALS)
+    ):
+        raise ValueError("ONNX detector output layout does not match configuration")
+
+
+def check_label_order(names: str | None, labels: tuple[str, ...]) -> None:
+    if names is None:
+        return
+    if len(names) > 64 * 1024:
+        raise ValueError("ONNX label metadata is too large")
+    try:
+        ordered = json.loads(names)
+    except json.JSONDecodeError:
+        ordered = ast.literal_eval(names)
+    if isinstance(ordered, dict):
+        ordered = [
+            ordered.get(index, ordered.get(str(index))) for index in range(len(ordered))
+        ]
+    if not isinstance(ordered, list) or tuple(ordered) != labels:
+        raise ValueError("ONNX label order does not match artifact metadata")
+
+
 class OnnxDetector:
     """CPU-only, batch-one float32 input and [1, 4 + classes, proposals] output."""
 
@@ -78,82 +159,14 @@ class OnnxDetector:
         self.categories = frozenset(settings.label_map.values())
         os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
         os.environ["ORT_DISABLE_TELEMETRY"] = "1"
-        hub = importlib.import_module("huggingface_hub")
-        filename = hub.hf_hub_download(
-            settings.id,
-            settings.filename,
-            revision=settings.revision,
-            cache_dir=settings.cache_dir,
-            local_files_only=True,
-        )
-        with open(filename, "rb") as source:
-            content = source.read(MAX_MODEL_BYTES + 1)
-        if (
-            len(content) > MAX_MODEL_BYTES
-            or hashlib.sha256(content).hexdigest() != settings.sha256
-        ):
-            raise ValueError(
-                "ONNX artifact size or digest does not match configuration"
-            )
-        onnx = importlib.import_module("onnx")
-        graph = onnx.load_model_from_string(content)
-        reject_external_data(graph)
-        onnx.checker.check_model(graph)
-        del graph
+        content = load_artifact(settings)
         self._np = importlib.import_module("numpy")
         self._cv = importlib.import_module("cv2")
-        runtime = importlib.import_module("onnxruntime")
-        runtime.disable_telemetry_events()
-        options = runtime.SessionOptions()
-        options.intra_op_num_threads = threads
-        options.inter_op_num_threads = 1
-        options.execution_mode = runtime.ExecutionMode.ORT_SEQUENTIAL
-        options.log_severity_level = 4
-        self._session = runtime.InferenceSession(
-            content,
-            sess_options=options,
-            providers=["CPUExecutionProvider"],
-        )
-        inputs = self._session.get_inputs()
-        outputs = self._session.get_outputs()
-        expected = [1, 3, settings.input_size, settings.input_size]
-        if (
-            len(inputs) != 1
-            or inputs[0].type != "tensor(float)"
-            or len(inputs[0].shape) != 4
-            or any(
-                isinstance(actual, int) and actual != wanted
-                for actual, wanted in zip(inputs[0].shape, expected, strict=True)
-            )
-        ):
-            raise ValueError("ONNX detector input shape does not match configuration")
-        if len(outputs) != 1 or outputs[0].type != "tensor(float)":
-            raise ValueError("ONNX detector requires one float32 proposal output")
-        shape = outputs[0].shape
-        if (
-            len(shape) != 3
-            or (isinstance(shape[0], int) and shape[0] != 1)
-            or (isinstance(shape[1], int) and shape[1] != len(settings.labels) + 4)
-            or (isinstance(shape[2], int) and shape[2] > MAX_PROPOSALS)
-        ):
-            raise ValueError("ONNX detector output layout does not match configuration")
+        self._session = create_session(content, threads)
+        check_signature(self._session, settings)
         self.artifact_metadata = dict(self._session.get_modelmeta().custom_metadata_map)
-        names = self.artifact_metadata.get("names")
-        if names is not None:
-            if len(names) > 64 * 1024:
-                raise ValueError("ONNX label metadata is too large")
-            try:
-                ordered = json.loads(names)
-            except json.JSONDecodeError:
-                ordered = ast.literal_eval(names)
-            if isinstance(ordered, dict):
-                ordered = [
-                    ordered.get(index, ordered.get(str(index)))
-                    for index in range(len(ordered))
-                ]
-            if not isinstance(ordered, list) or tuple(ordered) != settings.labels:
-                raise ValueError("ONNX label order does not match artifact metadata")
-        self._input_name = inputs[0].name
+        check_label_order(self.artifact_metadata.get("names"), settings.labels)
+        self._input_name = self._session.get_inputs()[0].name
         with Image.new("RGB", (32, 32), "white") as image:
             self.predict(self.prepare_image(image))
 
