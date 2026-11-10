@@ -7,6 +7,8 @@ name = "modera"
 version = "0.1.0"
 description = "Text and photo moderation service"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "aiohttp>=3.14.5,<4",
@@ -44,6 +46,9 @@ dev = [
     "pytest>=9,<10",
     "ruff>=0.17,<0.18",
 ]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/pyproject.toml", "/README.md", "/LICENSE", "/NOTICE"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/modera"]
