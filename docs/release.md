@@ -1,7 +1,7 @@
 # First release review
 
-The serving package provides the synchronous API. Research tools are under
-`evaluation/` and are excluded from the runtime image. No model is selected automatically.
+The serving package provides the synchronous API. The photo evaluation harness under
+`evaluation/` is excluded from the runtime image. No model is selected automatically.
 
 Implemented and tested:
 
@@ -14,8 +14,6 @@ Implemented and tested:
   failure; rules example, health and protected metrics.
 - Container checks for authentication, codecs, rules and read-only inference restart.
 
-- Blinded text/photo annotation packets, declared-human review/adjudication, explicit
-  score-category mappings, uncertainty exclusions and proposal-bound test-label export.
 - A standard-library Go client with typed errors/results, replayable uploads, bounded
   retries, request contexts, redirection protection and live rules-only API checks.
 
@@ -34,11 +32,9 @@ Before an external release:
 Durable async jobs, additional modalities, other SDKs and alternative runtimes remain
 future work. Current queues are process-local; see [operations](operations.md).
 
-Reference profiles remain experimental: the published external-source diagnostics
-and guard experiments do not establish production-quality defaults. Genuine category-
-aligned independent review is still required. Reviewer IDs/origins and source novelty
-are declarations, not identity or training-independence verification. No real human
-labels were manufactured by the workflow tests or examples.
+Reference profiles remain experimental. No independently labelled evidence here
+establishes production-quality defaults. Validate a policy on representative photos
+with the [evaluation harness](../evaluation/README.md) before it acts on real content.
 
 ## Go SDK release preparation
 

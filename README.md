@@ -129,7 +129,7 @@ uv build
 
 Code: `src/modera/`. Tests: `tests/unit/`, `tests/integration/`.
 Optional [capacity benchmarks](benchmarks/README.md) run with real models.
-See [quality evaluation](evaluation/README.md) for reproducible classifier comparisons.
+Use the [photo evaluation harness](evaluation/README.md) to check a policy on your own labelled photos.
 Dependencies: `pyproject.toml` and `uv.lock`.
 
 ## Integrations and review
@@ -137,11 +137,6 @@ Dependencies: `pyproject.toml` and `uv.lock`.
 The [Go client](clients/go/README.md) supports text, image URLs and uploads with
 context deadlines, bounded retries, typed results and explicit fallback provenance.
 It has no third-party dependencies.
-
-The [category review workflow](evaluation/review.md) creates blinded review packets,
-tracks disagreements, preserves uncertainty and exports sealed calibration/test
-labels. Its example inputs are synthetic; it does not supply independent human
-validation or select a production model automatically.
 
 For a runnable application using the SDK, see the
 [Go integration example](clients/go/cmd/moderate/README.md). It demonstrates

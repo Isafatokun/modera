@@ -44,8 +44,6 @@ were executed and no new serving default was installed.
    Record latency and hardware separately; a smaller artifact does not prove faster
    inference. Do not omit failures or treat missing evidence as clean content.
 
-The existing public photo challenge uses broader contextual sexual-safety labels;
-it is not an explicit-nudity benchmark. Reusing it would not resolve that mismatch.
 There is currently no evidence here that adding a detector improves moderation
 accuracy, and no production model/profile recommendation follows from this audit.
 
@@ -61,7 +59,7 @@ licensing is unchanged.
 The backend exposes winning-proposal category maxima without a confidence floor
 or cross-class suppression. It is not a claim of parity with NudeNet's package
 postprocessing. Training quality and independent moderation accuracy remain
-unverified. See [the backend contract](../docs/onnx.md).
+unverified. See [the backend contract](onnx.md).
 
 A synthetic 32×32 white-image API smoke also completed with this artifact and
 `viddexa/nsfw-detection-2-mini` at revision

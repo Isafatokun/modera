@@ -85,16 +85,7 @@ jobs:
           uv run --locked --group benchmark python benchmarks/run.py --help
           uv run --locked python benchmarks/prepare_models.py --help
           uv run --locked python benchmarks/server.py --help
-          uv run --locked python -m evaluation.compare_text --help
-          uv run --locked python -m evaluation.diagnose --help
-          uv run --locked python -m evaluation.calibrate --help
-          uv run --locked python -m evaluation.assess --help
-          uv run --locked python -m evaluation.external_text --help
-          uv run --locked python -m evaluation.photo_challenge --help
-          uv run --locked python -m evaluation.error_audit --help
-          uv run --locked python -m evaluation.next_models --help
-          uv run --locked python -m evaluation.qwen_probes --help
-          uv run --locked python -m evaluation.review --help
+          uv run --locked python -m evaluation.photos --help
       - run: uv run --locked pytest
       - run: uv build
 
