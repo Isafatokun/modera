@@ -212,113 +212,156 @@ func (c *Client) ModerateImage(ctx context.Context, image []byte, policy string)
 	return c.execute(ctx, body.Bytes(), writer.FormDataContentType(), "image", p)
 }
 
+type attemptOutcome struct {
+	status     int
+	header     http.Header
+	data       []byte
+	readErr    error
+	doErr      error
+	attemptErr error
+}
+
+type step struct {
+	result *Result
+	err    error
+	retry  bool
+	delay  time.Duration
+}
+
+func fail(err error) step              { return step{err: err} }
+func retryIn(delay time.Duration) step { return step{retry: true, delay: delay} }
+
 func (c *Client) execute(parent context.Context, body []byte, contentType, kind, requestedPolicy string) (*Result, error) {
 	if parent == nil {
 		return nil, errors.New("modera: context is required")
 	}
+
 	ctx, cancel := context.WithTimeout(parent, c.options.TotalTimeout)
 	defer cancel()
 	for attempt := 1; attempt <= c.options.MaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		requestCtx := ctx
-		stop := func() {}
-		if c.options.AttemptTimeout > 0 {
-			requestCtx, stop = context.WithTimeout(ctx, c.options.AttemptTimeout)
-		}
-		request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+		outcome, err := c.send(ctx, body, contentType)
 		if err != nil {
-			stop()
-			return nil, errors.New("modera: could not construct request")
+			return nil, err
 		}
-		request.Header.Set("Authorization", "Bearer "+c.apiKey)
-		request.Header.Set("Content-Type", contentType)
-		request.Header.Set("Accept", "application/json")
-		response, err := c.http.Do(request)
-		if err != nil {
-			attemptErr := requestCtx.Err()
-			stop()
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-			if attempt == c.options.MaxAttempts && attemptErr != nil {
-				return nil, attemptErr
-			}
-			if attempt == c.options.MaxAttempts || (!retryTransport(err) && !errors.Is(attemptErr, context.DeadlineExceeded)) {
-				return nil, errors.New("modera: transport request failed")
-			}
-			if err = c.pause(ctx, c.backoff(attempt)); err != nil {
-				return nil, err
-			}
-			continue
+		next := c.interpret(ctx, outcome, attempt, kind, requestedPolicy)
+		if !next.retry {
+			return next.result, next.err
 		}
-		data, readErr := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
-		response.Body.Close()
-		attemptErr := requestCtx.Err()
-		stop()
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		if attemptErr != nil {
-			if attempt < c.options.MaxAttempts && errors.Is(attemptErr, context.DeadlineExceeded) {
-				if err = c.pause(ctx, c.backoff(attempt)); err != nil {
-					return nil, err
-				}
-				continue
-			}
-			return nil, attemptErr
-		}
-		if readErr != nil {
-			canRetryStatus := response.StatusCode == 200 || response.StatusCode == 408 || response.StatusCode == 429 || response.StatusCode == 503
-			if attempt < c.options.MaxAttempts && canRetryStatus && retryTransport(readErr) {
-				if err = c.pause(ctx, c.backoff(attempt)); err != nil {
-					return nil, err
-				}
-				continue
-			}
-			return nil, errors.New("modera: response body read failed")
-		}
-		if len(data) > maxResponseBytes {
-			return nil, &ProtocolError{Status: response.StatusCode}
-		}
-		if response.StatusCode == http.StatusOK {
-			var result Result
-			if json.Unmarshal(data, &result) != nil || result.validate(kind) != nil || (!result.Fallback && result.Policy.ID != requestedPolicy) || (response.Header.Get("X-Request-ID") != "" && result.RequestID != response.Header.Get("X-Request-ID")) {
-				return nil, &ProtocolError{Status: response.StatusCode}
-			}
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-			return &result, nil
-		}
-		var envelope struct {
-			Error struct {
-				Code      string `json:"code"`
-				Retryable bool   `json:"retryable"`
-				RequestID string `json:"request_id"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(data, &envelope) != nil || !codePattern.MatchString(envelope.Error.Code) || !requestPattern.MatchString(envelope.Error.RequestID) || (response.Header.Get("X-Request-ID") != "" && envelope.Error.RequestID != response.Header.Get("X-Request-ID")) {
-			return nil, &ProtocolError{Status: response.StatusCode}
-		}
-		retryable := envelope.Error.Retryable && (response.StatusCode == 408 || response.StatusCode == 429 || response.StatusCode == 503)
-		apiErr := &APIError{Status: response.StatusCode, Code: envelope.Error.Code, RequestID: envelope.Error.RequestID, Retryable: retryable, RetryAfter: retryAfter(response.Header.Get("Retry-After"), c.now()), Attempts: attempt}
-		if !retryable || attempt == c.options.MaxAttempts {
-			return nil, apiErr
-		}
-		delay := max(c.backoff(attempt), apiErr.RetryAfter)
-		if deadline, ok := ctx.Deadline(); ok && delay >= time.Until(deadline) {
-			return nil, apiErr
-		}
-		if err = c.pause(ctx, delay); err != nil {
+		if err := c.pause(ctx, next.delay); err != nil {
 			return nil, err
 		}
 	}
 	return nil, errors.New("modera: attempts exhausted")
 }
 
+func (c *Client) send(ctx context.Context, body []byte, contentType string) (attemptOutcome, error) {
+	requestCtx := ctx
+	if c.options.AttemptTimeout > 0 {
+		var stop context.CancelFunc
+		requestCtx, stop = context.WithTimeout(ctx, c.options.AttemptTimeout)
+		defer stop()
+	}
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, c.endpoint, bytes.NewReader(body))
+	if err != nil {
+		return attemptOutcome{}, errors.New("modera: could not construct request")
+	}
+	request.Header.Set("Authorization", "Bearer "+c.apiKey)
+	request.Header.Set("Content-Type", contentType)
+	request.Header.Set("Accept", "application/json")
+
+	response, err := c.http.Do(request)
+	if err != nil {
+		return attemptOutcome{doErr: err, attemptErr: requestCtx.Err()}, nil
+	}
+	data, readErr := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	response.Body.Close()
+	return attemptOutcome{
+		status:     response.StatusCode,
+		header:     response.Header,
+		data:       data,
+		readErr:    readErr,
+		attemptErr: requestCtx.Err(),
+	}, nil
+}
+
+func (c *Client) interpret(ctx context.Context, o attemptOutcome, attempt int, kind, requestedPolicy string) step {
+	last := attempt == c.options.MaxAttempts
+	if o.doErr != nil {
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
+		}
+		if last && o.attemptErr != nil {
+			return fail(o.attemptErr)
+		}
+		if last || (!retryTransport(o.doErr) && !errors.Is(o.attemptErr, context.DeadlineExceeded)) {
+			return fail(errors.New("modera: transport request failed"))
+		}
+		return retryIn(c.backoff(attempt))
+	}
+	if ctx.Err() != nil {
+		return fail(ctx.Err())
+	}
+	if o.attemptErr != nil {
+		if !last && errors.Is(o.attemptErr, context.DeadlineExceeded) {
+			return retryIn(c.backoff(attempt))
+		}
+		return fail(o.attemptErr)
+	}
+	if o.readErr != nil {
+		canRetryStatus := o.status == 200 || o.status == 408 || o.status == 429 || o.status == 503
+		if !last && canRetryStatus && retryTransport(o.readErr) {
+			return retryIn(c.backoff(attempt))
+		}
+		return fail(errors.New("modera: response body read failed"))
+	}
+	if len(o.data) > maxResponseBytes {
+		return fail(&ProtocolError{Status: o.status})
+	}
+	if o.status == http.StatusOK {
+		return c.acceptResult(ctx, o, kind, requestedPolicy)
+	}
+	return c.interpretError(ctx, o, attempt)
+}
+
+func (c *Client) acceptResult(ctx context.Context, o attemptOutcome, kind, requestedPolicy string) step {
+	var result Result
+	if json.Unmarshal(o.data, &result) != nil || result.validate(kind) != nil || (!result.Fallback && result.Policy.ID != requestedPolicy) || (o.header.Get("X-Request-ID") != "" && result.RequestID != o.header.Get("X-Request-ID")) {
+		return fail(&ProtocolError{Status: o.status})
+	}
+	if ctx.Err() != nil {
+		return fail(ctx.Err())
+	}
+	return step{result: &result}
+}
+
+func (c *Client) interpretError(ctx context.Context, o attemptOutcome, attempt int) step {
+	var envelope struct {
+		Error struct {
+			Code      string `json:"code"`
+			Retryable bool   `json:"retryable"`
+			RequestID string `json:"request_id"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(o.data, &envelope) != nil || !codePattern.MatchString(envelope.Error.Code) || !requestPattern.MatchString(envelope.Error.RequestID) || (o.header.Get("X-Request-ID") != "" && envelope.Error.RequestID != o.header.Get("X-Request-ID")) {
+		return fail(&ProtocolError{Status: o.status})
+	}
+	retryable := envelope.Error.Retryable && (o.status == 408 || o.status == 429 || o.status == 503)
+	apiErr := &APIError{Status: o.status, Code: envelope.Error.Code, RequestID: envelope.Error.RequestID, Retryable: retryable, RetryAfter: retryAfter(o.header.Get("Retry-After"), c.now()), Attempts: attempt}
+	if !retryable || attempt == c.options.MaxAttempts {
+		return fail(apiErr)
+	}
+	delay := max(c.backoff(attempt), apiErr.RetryAfter)
+	if deadline, ok := ctx.Deadline(); ok && delay >= time.Until(deadline) {
+		return fail(apiErr)
+	}
+	return retryIn(delay)
+}
+
 func (c *Client) pause(ctx context.Context, delay time.Duration) error { return c.wait(ctx, delay) }
+
 func (c *Client) backoff(attempt int) time.Duration {
 	limit := c.options.BaseDelay
 	for i := 1; i < attempt; i++ {
@@ -330,6 +373,7 @@ func (c *Client) backoff(attempt int) time.Duration {
 	}
 	return time.Duration(c.random(int64(min(limit, c.options.MaxDelay))))
 }
+
 func retryAfter(header string, now time.Time) time.Duration {
 	if header != "" && strings.IndexFunc(header, func(r rune) bool { return r < '0' || r > '9' }) == -1 {
 		seconds, err := strconv.ParseUint(header, 10, 64)
@@ -343,6 +387,7 @@ func retryAfter(header string, now time.Time) time.Duration {
 	}
 	return 0
 }
+
 func retryTransport(err error) bool {
 	var unknown x509.UnknownAuthorityError
 	var invalid x509.CertificateInvalidError
