@@ -21,7 +21,7 @@ request IDs and metrics. It does not assess moderation accuracy.
 For a clean-cache acceptance run with the real checkpoints:
 
 ```sh
-python3 deploy/reference/verify.py --output reference-verification
+python3 e2e/reference/verify.py --output reference-verification
 ```
 
 This builds an isolated project, confirms the cache starts empty, checks text, uploads,

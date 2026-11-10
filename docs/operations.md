@@ -65,7 +65,7 @@ first. A native inference call cannot be cancelled, so the platform has to enfor
 final deadline. An interrupted request has no saved result and should be retried on
 another instance.
 
-The [rehearsal](../deploy/rehearsal/README.md) checks this with the Go client, two
+The [rehearsal](../e2e/rehearsal/README.md) checks this with the Go client, two
 real-model processes and NGINX, and CI runs it. These integration tests cover the
 process lifecycle:
 
@@ -74,7 +74,7 @@ uv run --locked --extra inference pytest tests/integration/test_service_process.
 ```
 
 They use tiny test models, so they verify behaviour, not moderation quality or
-throughput. For throughput, run the [benchmark](../benchmarks/README.md). Ingress
+throughput. For throughput, run the [load test](../loadtests/README.md). Ingress
 behaviour and termination still need testing on your hosting platform.
 
 ## Rotate the API key

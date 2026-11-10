@@ -79,6 +79,7 @@ application owns those, including retrying safely: a retry is a new evaluation.
 | [Models](docs/models.md) | Choosing, preparing and replacing models |
 | [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
 | [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
+| [Verification](docs/verification.md) | What is tested, how to run it, and what is not shown |
 | [Evaluation](evaluation/README.md) | Checking a policy on your own labelled photos |
 
 ## Development
@@ -91,7 +92,7 @@ uv run --locked pytest
 ```
 
 Source is in `src/modera`, tests in `tests/`. See [CONTRIBUTING](CONTRIBUTING.md) for the
-full checks and [SECURITY](SECURITY.md) to report a vulnerability. [Benchmarks](benchmarks/README.md)
+full checks and [SECURITY](SECURITY.md) to report a vulnerability. [Load tests](loadtests/README.md)
 measure capacity with real models, and [releasing](docs/releasing.md) is for maintainers.
 
 ## Licence

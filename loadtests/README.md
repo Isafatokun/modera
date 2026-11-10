@@ -6,9 +6,9 @@ classifiers, FP32 on CPU, one process and two threads per model. It cannot targe
 existing deployment.
 
 ```sh
-uv sync --locked --extra inference --group benchmark
-uv run --locked --extra inference --group benchmark python benchmarks/prepare_models.py /tmp/modera-model-cache
-uv run --locked --extra inference --group benchmark python benchmarks/run.py --cache /tmp/modera-model-cache --seconds 20
+uv sync --locked --extra inference --group loadtest
+uv run --locked --extra inference --group loadtest python loadtests/prepare_models.py /tmp/modera-model-cache
+uv run --locked --extra inference --group loadtest python loadtests/run.py --cache /tmp/modera-model-cache --seconds 20
 ```
 
 Preparation downloads about 0.9 GiB of pinned weights, and the benchmark then loads them
@@ -20,7 +20,7 @@ traffic, paced load and unpaced bursts of eight clients. Requests are never retr
 The generator is closed loop, so paced workers fall below their target rate when
 requests are slow, and in-flight requests can stretch a scenario's wall time.
 
-Each run writes to a new ignored directory under `benchmarks/results/`, or to
+Each run writes to a new ignored directory under `loadtests/results/`, or to
 `--output`, which must not exist. It records the commit and dirty state, dependency
 versions, model provenance, fixtures, raw latency samples, status and error counts,
 health probes, metrics, peak server memory and a final recovery request. An interrupted

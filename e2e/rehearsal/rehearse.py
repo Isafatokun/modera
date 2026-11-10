@@ -189,7 +189,7 @@ class Rehearsal:
             process = self.spawn(
                 [
                     sys.executable,
-                    str(ROOT / "deploy/rehearsal/bootstrap.py"),
+                    str(ROOT / "e2e/rehearsal/bootstrap.py"),
                     "--fd",
                     str(listener.fileno()),
                     "--control",

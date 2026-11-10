@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/deployment-rehearsal.yml'
-      - 'deploy/rehearsal/**'
+      - 'e2e/rehearsal/**'
       - 'deploy/reference/models.json'
       - 'deploy/reference/policies.json'
       - 'clients/go/**'
@@ -43,7 +43,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends nginx
       - name: Exercise SDK, real models and gateway lifecycle
         run: >-
-          uv run --locked --extra inference python deploy/rehearsal/rehearse.py
+          uv run --locked --extra inference python e2e/rehearsal/rehearse.py
           --nginx /usr/sbin/nginx --download
           --cache-dir "${{ runner.temp }}/rehearsal-models"
           --output rehearsal-verification

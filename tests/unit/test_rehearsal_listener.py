@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from deploy.rehearsal.rehearse import listener_socket, owns_socket
+from e2e.rehearsal.rehearse import listener_socket, owns_socket
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux /proc rehearsal barrier")
