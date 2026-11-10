@@ -1,73 +1,54 @@
-# Text quality evaluation
+# Photo evaluation
 
-Compare pinned classifiers using the real CPU FP32 adapter and unchanged 256-token
-limit. Serving defaults are not changed. This is model/policy evaluation, not HTTP
-capacity or latency measurement.
+Check a policy on your own labelled photos before it acts on real content. The
+harness submits each photo to a running Modera API and reports where the decision
+differs from your label. It does not run models itself, choose thresholds or
+install defaults.
 
-```sh
-uv sync --locked --extra inference --group evaluation
-uv run --locked --extra inference --group evaluation python -m evaluation.compare_text prepare \
-  --directory evaluation/data/publisher-test --cache model-cache
-uv run --locked --extra inference --group evaluation python -m evaluation.compare_text models \
-  --cache model-cache
-uv run --locked --extra inference --group evaluation python -m evaluation.compare_text run \
-  --directory evaluation/data/publisher-test --candidate evaluation/candidates/horizon-small.json \
-  --cache model-cache --output evaluation/results/horizon-small
-uv run --locked --extra inference --group evaluation python -m evaluation.compare_text run \
-  --directory evaluation/data/publisher-test --candidate evaluation/candidates/gravitee-distilbert.json \
-  --cache model-cache --output evaluation/results/gravitee-distilbert
+## Cases
+
+`cases.json` is a JSON array. Photos are files beside it.
+
+```json
+[
+  {"id": "p1", "file": "p1.jpg", "expected": "allow", "slice": "ordinary"},
+  {"id": "p2", "file": "p2.jpg", "expected": "block", "slice": "explicit"}
+]
 ```
 
-Preparation removes normalized exact matches with the publisher's training data,
-conflicting-label groups and duplicate test texts, then selects 50 examples per
-language/label by normalized-text SHA-256. It freezes the sample hash before inference.
-Existing directories are rejected; interrupted preparation can use a new directory
-with the same download cache. No threshold tuning, retries or silent truncation.
+`expected` is `allow`, `review` or `block`. `slice` is optional and groups results
+(for example by lighting, clothing or source). Define what each label means in plain
+words before labelling, label before viewing model scores, and keep photos used to
+tune thresholds apart from the photos you assess with.
 
-The threshold is fixed at 0.5, representing review **or** block under the reference
-policy, not automatic blocking. Raw scores/errors are flushed after every case;
-only a complete run writes `report.json`. Reports retain failures, per-language
-confusion matrices, sample/model fingerprints and library versions. End-to-end
-recall includes failed cases; undefined ratios are `null`. Scores are not calibrated
-or interchangeable across models.
-
-The **Text quality comparison** workflow repeats this on a fresh runner and uploads
-reports and predictions for 30 days, including partial predictions on failure.
-It uploads no raw texts, credentials or model weights. Local `data/` and `results/`
-are ignored by Git. See [results and limitations](results.md).
-
-To examine ranking across the full score range without fitting a test-set cutoff:
+## Run
 
 ```sh
-uv run --locked python -m evaluation.diagnose \
-  --directory evaluation/data/publisher-test --run evaluation/results/horizon-small \
-  --output evaluation/results/horizon-small/diagnostic.json
+export MODERA_API_KEY=...        # never pass the key as a flag
+uv run --locked python -m evaluation.photos \
+  --cases evaluation/data/cases.json \
+  --output evaluation/results/run-1.json \
+  --url http://127.0.0.1:8000 --policy default
 ```
 
-The diagnostic verifies sample and prediction fingerprints, handles tied scores,
-and reports ROC AUC by language with failure counts. It does not select a threshold.
-Use separate, representative validation data for calibration and new held-out data
-for the final assessment; these already-inspected cases are diagnostic evidence.
+HTTP is accepted only for loopback; use HTTPS otherwise. The output file must not
+exist. `evaluation/data/` and `evaluation/results/` are ignored by Git.
 
-Source: [publisher dataset](https://huggingface.co/datasets/gravitee-io/textdetox-multilingual-toxicity-dataset),
-revision `bc570f7558ab8cbd8d0d9a550c7406e8343fad90`, derived from TextDetox.
-The dataset and Gravitee classifier declare OpenRAIL++; Horizon declares Apache-2.0.
-Model terms are separate from Modera's code licence. This is a publisher-test
-comparison, not a new independent benchmark. Exact-match filtering cannot audit
-paraphrases, related sources or pretraining. Balanced samples do not represent
-production prevalence, and 50 examples per class/language give limited precision.
-Do not tune thresholds on this test and reuse it as independent validation.
+## Read the report
 
-Use [policy calibration](calibration.md) to propose a review cutoff from your own
-labelled validation responses, then assess the frozen proposal on the reserved
-held-out set without retuning.
+- **missed**: expected `review` or `block`, but the decision was `allow`.
+- **false_flags**: expected `allow`, but the decision was `review` or `block`.
+- **wrong_level**: flagged, but as `review` where `block` was expected or the reverse.
+- **failed_checks / failure_codes**: no decision was produced (for example a timeout
+  or `check_unavailable`). These are counted apart and are never treated as `allow`.
+  Re-run to retry; the harness does not retry for you.
+- **provenance / provenance_consistent**: the policy ID and version, model revisions
+  and preprocessing seen across the run. `false` means the configuration changed
+  mid-run and the results should not be compared.
+- **slices**: the same counts per slice. **total_seconds** and **slowest_seconds**
+  describe the sequential run, not capacity.
 
-For external French/English sources, exploratory held-out review gates and a
-separate image coverage challenge, see [external-source evaluation](external.md).
-
-Use the [category review workflow](review.md) to collect blinded human annotations,
-adjudicate disagreements and export category-specific calibration manifests.
-
-For paired classifier, detector and combined image policies, see
-[image comparison](image-comparison.md). It uses the same held-out case IDs and
-retains failed checks; it does not supply labelled photos or choose thresholds.
+Lists contain case IDs only, never photo content. Report counts alongside rates:
+small or correlated samples give weak evidence. After changing thresholds, assess
+again on fresh held-out photos. To compare configurations, run the harness once per
+configuration against the same cases and compare the reports.

@@ -48,7 +48,7 @@ and 256 labels. These limits bound processing; they do not establish capacity.
 
 ## Research candidate
 
-The pinned [candidate configuration](../evaluation/candidates/nudenet-onnx.json)
+The pinned [candidate configuration](../examples/nudenet-onnx.json)
 loads and warms successfully. It is not a recommended moderation profile. Its
 model-card terms and embedded artifact terms disagree; that remains unresolved.
 The [example policy](../examples/onnx-policy.json) illustrates configuration only.
@@ -56,7 +56,7 @@ Do not treat its threshold as calibrated.
 
 ```sh
 uv run --locked --extra onnx python -m modera.prepare_models \
-  --config evaluation/candidates/nudenet-onnx.json
+  --config examples/nudenet-onnx.json
 ```
 
 Set `MODERA_MODEL_FILE` to your model file and `MODERA_POLICY_FILE` to your policy;
