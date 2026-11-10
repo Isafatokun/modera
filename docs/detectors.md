@@ -23,6 +23,7 @@ No confidence cutoff is applied before policy evaluation. Your policy thresholds
 still decide allow, review or block. Scores are model confidence values, not
 calibrated probabilities. Boxes remain internal and are not returned.
 
-Existing classifier configurations and API requests continue to work. For a detector and classifier on the same photo, see
-[combining models](combining-models.md). Person association is not supported. A generic object detector is not automatically a
-suitable moderation model: evaluate the actual model and categories before use.
+To use a detector with a classifier on the same photo, see
+[combining models](combining-models.md). Person association is not supported. A generic
+object detector is not automatically a suitable moderation model, so evaluate the actual
+model and categories before use.

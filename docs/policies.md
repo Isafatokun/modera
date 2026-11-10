@@ -22,7 +22,7 @@ Example thresholds are illustrative; calibrate against your models and content.
 
 Coverage is checked first. Block takes precedence over review, then allow. Reasons
 list the winning categories in policy order. Findings outside the policy do not affect
-its decision. Evaluation does not run models, store results, or create review cases.
+its decision.
 
 | Condition | Outcome |
 | --- | --- |
@@ -40,10 +40,10 @@ under their own ID/version, rather than claiming the original policy completed.
 
 ## Deployment
 
-Unreadable, invalid, empty, or oversized (>1 MiB) configurations prevent startup.
-Each application keeps an immutable snapshot; restart/redeploy after changes and bump
-the version. Versions are operator-assigned; there is no stored policy history.
-Mount files read-only in containers. The example is not included in the runtime image.
+An unreadable, invalid, empty or oversized (over 1 MiB) file prevents startup. The
+service keeps an immutable snapshot, so restart after a change and bump the version.
+Versions are yours to assign and Modera keeps no policy history. Mount the file
+read-only in containers; the example is not in the runtime image.
 
 No file or thresholds are installed by default. Configuring any moderation backend
 requires a policy file; unconfigured modalities return `501`.

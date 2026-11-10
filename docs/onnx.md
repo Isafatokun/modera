@@ -39,12 +39,12 @@ For each proposal, its highest-scoring label wins. Each mapped category receives
 the highest confidence among proposals with that label, or zero when none wins.
 There is no confidence cutoff before the policy. Boxes are not returned.
 Class-wise non-maximum suppression would preserve these category maxima, so it is
-not run. This does **not** reproduce a package that suppresses different classes
-against each other or applies its own confidence floor.
+not run. A package that suppresses across classes or applies its own confidence floor
+will score differently.
 
 Artifacts are limited to 256 MiB; images to 4096 pixels per side for this backend.
 The existing byte/pixel limits still apply. Output is limited to 40,000 proposals
-and 256 labels. These limits bound processing; they do not establish capacity.
+and 256 labels. These limits bound processing and say nothing about capacity.
 
 ## Research candidate
 

@@ -2,7 +2,7 @@
 
 Use a detector and a classifier together when they provide complementary evidence.
 Configure up to four image models in `image_models` instead of the single `image`
-field. Existing single-model configurations still work.
+field.
 
 Start from [example model configuration](../examples/ensemble-models.json) and
 [example policy](../examples/ensemble-policies.json). Replace the example model IDs,
@@ -41,9 +41,8 @@ For example, review only when both signals reach their own thresholds:
 }
 ```
 
-Minimums are inclusive. They are example values, not recommended thresholds.
-A combination produces no new probability or invented model finding. The response
-keeps the original scores; `decision.reasons` lists contributing categories and
+Minimums are inclusive, and these are example values, not recommended thresholds.
+A combination produces no new score. The response keeps the original scores; `decision.reasons` lists contributing categories and
 `decision.matched_rules` identifies composite rules contributing to the chosen
 action. Block takes precedence over review.
 
