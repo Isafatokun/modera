@@ -1,21 +1,20 @@
 # Start here
 
-Choose what you want to try. Both paths bind the API to your own machine.
+Pick a path. Both bind to localhost.
 
-| Goal | Start with | Requirements |
+| Goal | Start with | Needs |
 | --- | --- | --- |
-| Learn requests and decisions | [Text rules demo](../README.md#run) | Python 3.12 and uv; no model download |
-| Run real text and photo models | [Docker Compose setup](../deploy/reference/README.md) | Docker Compose v2; about 0.6 GiB of weights downloaded on first run |
-| Connect your backend | [Go example](../clients/go/README.md) or [API reference](api.md) | A running service and its bearer key |
+| Try requests and decisions | [Quick start](../README.md#quick-start) | Python 3.12 and uv, no model download |
+| Run real text and photo models | the Docker Compose setup below | Docker Compose v2, about 0.6 GiB of weights on first run |
+| Connect your backend | [Go client](../clients/go/README.md) or [API](api.md) | A running service and its key |
 
-The rules demo checks example phrases only. It does not demonstrate model quality
-or photo moderation. The real-model setup uses explicit, pinned example models
-and thresholds; these are not a recommendation for your content or audience.
-Neither path establishes production capacity or moderation accuracy.
+The rules demo matches example phrases and shows nothing about model quality or photo
+moderation. The Compose setup uses pinned example models and thresholds that are not a
+recommendation for your content. Neither path measures capacity or accuracy.
 
-## First real-model run
+## Real models with Docker Compose
 
-From a checkout of this repository, with Docker running:
+From a checkout, with Docker running:
 
 ```sh
 export MODERA_API_KEY="$(openssl rand -hex 32)"
@@ -23,15 +22,12 @@ docker compose up --build --force-recreate --wait --wait-timeout 600
 docker compose --profile checks run --rm --no-deps check
 ```
 
-Keep the key in your backend or secret manager. The preparation container downloads
-and warms the models; the service then reads the cached weights without downloading
-at startup. Compose manages the cache volume and its permissions for you.
+A preparation container downloads and warms the models, and the service then reads the
+cached weights without touching the network. The check sends neutral text and a
+generated white image. It proves the API works, not that harmful content is detected.
+`docker compose down` stops it and keeps the weights for next time.
 
-The check sends neutral text and a generated white image. It verifies that the API
-works, not that harmful content will be detected. Stop with `docker compose down`;
-this retains the cached weights for the next run.
-
-Upload a photo from your machine using the same shell:
+Upload a photo with the same shell:
 
 ```sh
 curl http://127.0.0.1:8000/v1/moderations \
@@ -39,45 +35,40 @@ curl http://127.0.0.1:8000/v1/moderations \
   -F 'file=@./photo.jpg'
 ```
 
-Replace `./photo.jpg` with your own file. File uploads need no URL allowlist.
-For remote photo URLs, explicitly allow the source host using the
-[URL setup instructions](../deploy/reference/README.md#url-and-unavailable-source-checks).
+Uploads need no URL allowlist. To fetch remote photos, allow the host as described in
+the [reference setup](../deploy/reference/README.md#url-checks).
 
-## Understand the response
+## Reading the response
 
-- `allow`: no configured rule reached a review or block threshold.
-- `review`: your application should hold the content for human review.
-- `block`: a configured block threshold was reached.
-- An error: evaluation did not produce a decision. Do not treat it as an allow.
+- `allow`: no configured check reached a threshold.
+- `review`: hold the content for human review.
+- `block`: a block threshold was reached.
+- an error: no decision was made, so never treat it as an `allow`.
 
-Modera returns evidence; your application takes the action. For unexpected results,
-check `findings`, `coverage`, `policy`, `models` and `fallback` together. A low score
-explains how the configured policy ran; it does not prove the content is safe.
-See the [request diagram and concepts](how-it-works.md).
+Modera returns evidence and your application takes the action. If a result surprises
+you, read `findings`, `coverage`, `policy`, `models` and `fallback` together; a low score
+only shows how the configured policy ran. See [how it works](how-it-works.md).
 
-## If you get stuck
+## When it doesn't work
 
-| Symptom | What to check |
+| Symptom | Check |
 | --- | --- |
-| Service never becomes ready | Run `docker compose logs prepare modera`; check download access, free disk space and the reported configuration error. Redact secrets before sharing logs. |
-| Port 8000 is occupied | Set `MODERA_PORT=8001`, restart Compose, and use that port in requests. |
-| `401` | Use the key from the shell that started the service. Never send a key in a URL. |
-| `501` | That input type has no configured backend. The rules demo supports text only. |
-| Photo URL fails | Check the exact allowed hostname and HTTPS source. Try a file upload to separate retrieval from inference. |
-| `503` | Read the error code and `Retry-After`; use bounded retries. Persistent failures need investigation. |
-| `500` | An internal check failed. Keep the request ID for diagnosis; do not automatically retry. |
+| Never becomes ready | `docker compose logs prepare modera`: download access, disk space, and the configuration error (redact secrets before sharing). |
+| Port 8000 is taken | Set `MODERA_PORT=8001`, restart, and use that port. |
+| `401` | Use the key from the shell that started the service, and never put a key in a URL. |
+| `501` | That input type has no backend. The rules demo handles text only. |
+| Photo URL fails | Check the exact allowed hostname and that the source is HTTPS. Try an upload to separate fetching from inference. |
+| `503` | Read the error code and `Retry-After`, and retry a bounded number of times. Persistent failures need investigation. |
+| `500` | An internal check failed. Keep the request ID and don't retry automatically. |
 
-## Before exposing the service
+## Before you expose it
 
-Choose and evaluate models and policies for your actual inputs. Configure HTTPS,
-network access, secret management and monitoring. Measure capacity on your hardware,
-and test overload, restart and shutdown behaviour. Follow the
-[operations guide](operations.md) and [reference setup notes](../deploy/reference/README.md)
-for the deployment details.
+Evaluate models and policies on your own inputs. Set up HTTPS, network access, secret
+management and monitoring, measure capacity on your hardware, and test overload,
+restart and shutdown. The [operations guide](operations.md) and
+[reference setup](../deploy/reference/README.md) cover the details.
 
-## Generate your own rules demo
-
-From the repository root:
+## Generate a rules demo of your own
 
 ```sh
 uv sync --locked
@@ -87,13 +78,11 @@ uv run --project .. --locked python -m modera.cli doctor --env-file .env
 uv run --project .. --locked uvicorn modera.main:create_app --factory --env-file .env --host 127.0.0.1
 ```
 
-`init` creates editable `policies.json`, `text-rules.json` and a private `.env`
-containing a generated key. It refuses to overwrite an existing directory.
-The example policy is named `rules-example`. No model or photo checks are installed.
-Keep this demo on localhost; do not commit or share `.env`.
+`init` writes editable `policies.json` and `text-rules.json` and a private `.env` with a
+generated key. It will not overwrite an existing directory, and the example policy is
+named `rules-example`. Keep `.env` private and out of version control.
 
-`doctor` checks configuration and required category mappings without loading models
-or contacting the API. It does not certify readiness, resource capacity or accuracy.
-Run it from the generated directory. Existing environment variables take priority
-over `.env`; use a fresh shell if settings from another setup are still exported.
-Uvicorn loads `.env` only because the command explicitly supplies `--env-file`.
+`doctor` checks the configuration and category mappings without loading models or
+contacting the API. It does not check readiness, capacity or accuracy. Existing
+environment variables take priority over `.env`, so use a fresh shell if another setup
+is still exported.

@@ -1,135 +1,90 @@
 # Operations
 
-Run one worker per instance. Each process loads its own model weights and maintains
-its own concurrency limits and metrics. Scale with separate instances when memory
-and CPU budgets permit; scrape each instance directly, rather than a load-balanced
-metrics URL. Multiprocess metric aggregation is not configured.
+Run one worker per instance. Each process loads its own models and keeps its own
+limits and metrics. Scale by adding instances and scrape each one directly, since
+metrics are not aggregated across processes.
 
 ## Metrics
 
-`GET /metrics` requires `Authorization: Bearer <key>` and returns Prometheus text
-with `Cache-Control: no-store`. Configure the scraper's bearer credential through
-its secret store. Keep the endpoint behind the deployment's network controls.
+`GET /metrics` returns Prometheus text and needs the same bearer key as the API. Keep
+it behind your network controls.
 
 | Metric | Meaning |
 | --- | --- |
-| `modera_moderation_requests_total{status_code}` | Completed moderation HTTP responses by status; `0` means the response did not complete, such as cancellation |
-| `modera_moderation_request_duration_seconds` | Histogram covering body reading, validation, downloads, inference, and response sending, including failures |
-| `modera_moderation_requests_in_flight` | Active moderation HTTP requests, including requests being rejected |
-| `modera_decisions_total{input_type,policy,action,fallback}` | Completed policy evaluations, separated by the policy actually used and rules fallback |
-| `modera_category_score{input_type,category,source}` | Histogram of category scores from completed evaluations |
-| `modera_worker_active{worker}` | Occupied native slots, including work that outlives its HTTP request; image inference sums the configured model workers |
-| `modera_worker_waiting{worker}` | Jobs currently waiting for that worker slot |
+| `modera_moderation_requests_total{status_code}` | Moderation responses by status. `0` means the response never completed, for example a cancelled request. |
+| `modera_moderation_request_duration_seconds` | Request latency, including body reading, downloads, inference and failures. |
+| `modera_moderation_requests_in_flight` | Requests being handled, including ones being rejected. |
+| `modera_decisions_total{input_type,policy,action,fallback}` | Completed evaluations by the policy actually used. |
+| `modera_category_score{input_type,category,source}` | Histogram of category scores from completed evaluations. |
+| `modera_worker_active{worker}` | Occupied worker slots, including native work that outlives its HTTP request. |
+| `modera_worker_waiting{worker}` | Jobs waiting for that worker. |
 
-HTTP counters and latency cover only `POST /v1/moderations`; scrapes, health checks
-and other paths are excluded. Worker labels are fixed: `text_inference`,
-`image_inference`, `image_preparation`. Gauges sample current slot/queue occupancy;
-cancelled or expired waiters are removed. A busy native worker can remain active
-after HTTP requests fall to zero. Downloads and literal text rules are not included
-in these worker gauges.
+Counters and latency cover only `POST /v1/moderations`; health checks and scrapes are
+excluded. The `worker` label is one of `text_inference`, `image_inference` or
+`image_preparation`. Labels never contain content, URLs, model IDs, credentials or
+request IDs, and unknown policy names in requests never become label values. Keep the
+number of policies and categories small, since each adds histogram series.
 
-Decision and score labels come from validated results and operator configuration.
-Unknown policy names in requests never create label values. Keep configured policy
-and category sets small: each histogram adds a series per bucket and label set.
-Labels contain no content, URLs, model IDs, credentials, or request IDs.
-Counters reset on restart; the monitoring system retains history.
+Watch the `503` rate next to latency and in-flight requests. The error code tells
+callers whether a `503` came from request capacity, a busy worker or an unavailable
+check. Decision counters count completed evaluations, not published content, and
+errors produce no samples. Scores are model signals, so read their distributions
+with the model, policy and input mix in mind.
 
-Track the `503` rate alongside latency and active requests. A `503` can indicate
-request capacity, an occupied inference/validation worker, or an unavailable check;
-the API error code distinguishes these cases for callers. Size and tune limits
-using the chosen models, instance resources, media sizes, and representative traffic.
+## Overload
 
-Decision counters count completed evaluations, even if the caller disconnects before
-receiving the response. They are not counts of published content. Errors produce
-no decision or score samples. Scores are model signals, not calibrated probabilities;
-compare distributions only with the model, policy and input mix in mind. Aggregate
-metrics do not explain an individual result or establish model accuracy.
+`MODERA_MAX_IN_FLIGHT_REQUESTS` (default 8) limits concurrent requests per process.
+After authentication, extra requests get `503 service_busy` with `Retry-After: 1`
+before their body is read.
 
-## Overload and recovery
+Photo preparation and each photo model have one active slot and a FIFO queue of
+`MODERA_IMAGE_QUEUE_SIZE` jobs (default 5), each waiting at most
+`MODERA_IMAGE_QUEUE_WAIT_SECONDS` (default 2). A full queue returns
+`503 service_busy`, and an expired wait returns `503 queue_wait_timeout`. Text
+inference and downloads have no queue and reject immediately when busy. Text and each
+photo model are independent, so a busy photo model does not block text. CPU and
+memory remain shared. Health checks and metric scrapes bypass these limits.
 
-`MODERA_MAX_IN_FLIGHT_REQUESTS` defaults to 8 per process. After authentication,
-excess requests receive `503 service_busy` with `Retry-After: 1` before their body
-is read. Photo validation/preparation and each photo model have one active slot
-and a bounded FIFO: `MODERA_IMAGE_QUEUE_SIZE=5`, with at most
-`MODERA_IMAGE_QUEUE_WAIT_SECONDS=2` seconds of waiting inside the stage deadline.
-Set queue size to `0` for immediate rejection. A full queue returns `503 service_busy`;
-an expired wait returns `503 queue_wait_timeout`. Both include `Retry-After: 1`.
-Downloads and text inference remain fail-fast. Health checks and scrapes bypass
-these limits.
-Text inference and each configured photo model reuse their loaded model. A busy
-photo model does not occupy the text inference slot, or vice versa. This separates
-inference admission; HTTP admission, CPU, memory, and the interpreter remain shared.
-
-Caller retries should have a deadline, bounded attempts, and jitter. A caller
-timeout or cancellation releases its HTTP slot, but native work keeps its worker
-slot until completion. This prevents retries from accumulating hidden native work.
-Put connection/request limits and TLS at the ingress as well: application admission
-does not bound connections or bytes buffered by the HTTP server or proxy.
-
-Waiting jobs are process-local and are not submitted to a hidden executor queue.
-Worker cleanup rejects remaining waiting/new work; already running native work may
-finish. Nothing is durable across restart. Bounded waiting absorbs short bursts,
-not sustained overload; it does not coordinate separate instances or increase
-model throughput.
-
-Integration tests exercise concurrent request saturation, rejection, cancellation,
-and recovery. They verify behavior, not deployment throughput or model capacity.
-For real-model HTTP measurements, run the [capacity benchmark](../benchmarks/README.md).
+When a caller times out, its HTTP slot is released but the native work keeps its worker
+slot until it finishes, so retries cannot pile hidden work on top of work that is
+still running. Callers should retry with a deadline, a bounded number of attempts and
+jitter. Queues are in memory and per process: they absorb short bursts, not sustained
+overload, and nothing survives a restart. Put connection limits and TLS at your
+ingress, because Modera does not bound connections or the bytes a proxy buffers.
 
 ## Startup and shutdown
 
-Model loading and warmup finish before readiness and HTTP serving. Missing or
-incompatible weights fail startup, unless the configured text fallback applies.
-Use `/health/ready` for traffic routing and `/health/live` for liveness; allow
-enough startup time for the selected models on the deployment hardware.
+Models load and warm up before the service reports ready. Missing or incompatible
+weights fail startup, unless text fallback applies. Route traffic on `/health/ready`
+and use `/health/live` for liveness, and allow enough startup time for your models.
 
-The container explicitly runs one worker, even if `WEB_CONCURRENCY` is set.
-On `SIGTERM`, Uvicorn stops accepting connections and drains accepted requests
-before application cleanup. Its request-drain timeout is 30 seconds. Configure
-the platform's termination grace period above that, for example 45 seconds, and
-remove the instance from ingress routing before termination. Native inference
-cannot be forcibly cancelled by this timeout; the platform must enforce the final
-process termination deadline. An interrupted request has no saved result and may
-need retrying against another instance. Uvicorn re-raises the shutdown signal
-after cleanup; process exit alone does not prove that native work or an accepted
-request completed. Verify the response when testing successful draining.
+The container runs a single worker. On `SIGTERM`, Uvicorn stops accepting connections
+and drains accepted requests, for up to 30 seconds. Set the platform's termination
+grace period above that, for example 45 seconds, and take the instance out of routing
+first. A native inference call cannot be cancelled, so the platform has to enforce the
+final deadline. An interrupted request has no saved result and should be retried on
+another instance.
 
-Reproduce the process checks with:
+The [rehearsal](../deploy/rehearsal/README.md) checks this with the Go client, two
+real-model processes and NGINX, and CI runs it. These integration tests cover the
+process lifecycle:
 
 ```sh
 uv run --locked --extra inference pytest tests/integration/test_service_process.py -q
 ```
 
-These cover authenticated HTTP requests, real local classifier loading, draining
-an active photo request, `SIGTERM`, restart and missing-weight startup failure.
-The tiny test classifier verifies the lifecycle, not moderation quality. To check
-the inference container with a read-only filesystem/cache and a stop/start:
-
-```sh
-docker build --build-arg INFERENCE=true -t modera:smoke .
-MODERA_TEST_CONTAINER_IMAGE=modera:smoke uv run --locked --extra inference pytest tests/integration/test_container.py -q
-```
-
-CI runs both checks. The [gateway and lifecycle rehearsal](../deploy/rehearsal/README.md)
-adds the Go SDK, two real-model processes, NGINX removal/reload, overload/retry,
-active-request draining and an enforced final termination deadline. Its workflow
-retains evidence. Ingress behavior and termination still need testing on the
-chosen hosting platform.
+They use tiny test models, so they verify behaviour, not moderation quality or
+throughput. For throughput, run the [benchmark](../benchmarks/README.md). Ingress
+behaviour and termination still need testing on your hosting platform.
 
 ## Rotate the API key
 
-Keep keys in your secret manager. To rotate without requiring every caller to
-switch at the same instant:
+To rotate without switching every caller at once:
 
-1. Generate a new key. Deploy it as `MODERA_API_KEY`, with the old key as
-   `MODERA_PREVIOUS_API_KEY`. Wait until all instances accept both keys.
-   With the reference Compose setup, export both variables and recreate the service.
-2. Update callers and the metrics scraper to use the new key. Confirm they work.
-3. Remove `MODERA_PREVIOUS_API_KEY` and roll out that change to all instances.
-   Confirm the old key is rejected.
+1. Deploy the new key as `MODERA_API_KEY` and keep the old one as
+   `MODERA_PREVIOUS_API_KEY`. Wait until every instance accepts both.
+2. Move callers and the metrics scraper to the new key and confirm they work.
+3. Remove `MODERA_PREVIOUS_API_KEY`, roll it out, and confirm the old key is rejected.
 
-Both keys have the same permissions and the same validation requirements. Keep
-the overlap short; there is no automatic expiry or live reload. Restart instances
-for each configuration change and keep enough healthy capacity during rollout.
-Never retain a compromised key for convenience. Keys are not included in metric
-labels, and the service does not report which key a caller used.
+Both keys have the same permissions. Keep the overlap short: there is no expiry or
+live reload, so each change is a restart. Never keep a compromised key for convenience.

@@ -2,11 +2,9 @@
 
 `POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
-For the visual overview and caller responsibilities, start with
-[how Modera works](how-it-works.md).
-
-Configured backends return a policy decision. A modality with no model or rules
-backend returns `501 moderation_not_implemented`. See [model setup](models.md).
+See [how it works](how-it-works.md) for the flow and your responsibilities as the
+caller. An input type with no model or rules backend returns
+`501 moderation_not_implemented`; see [models](models.md).
 
 ## Requests
 
@@ -30,14 +28,15 @@ curl http://127.0.0.1:8000/v1/moderations \
   -F 'file=@photo.jpg' -F 'policy=default'
 ```
 
-One input per request. `policy` defaults to `default`. Unknown/conflicting fields,
-duplicate form fields, base64, audio, video, and batches are rejected. Image URLs
-require HTTPS on port 443 and cannot contain credentials or fragments. Configure exact
-hosts, for example `MODERA_IMAGE_ALLOWED_HOSTS='["media.example.com"]'`; downloads
-are disabled by default. Private/internal DNS answers, redirects, environment proxies,
-and response compression are rejected. TLS certificates and hostnames are verified.
-Uploaded and downloaded images must decode as still JPEG, PNG, or WebP. Filename and MIME type are not trusted.
-Files are closed after reading; image data is not retained as a stored asset.
+One input per request, and `policy` defaults to `default`. Unknown or conflicting
+fields, duplicate form fields, base64, audio, video and batches are rejected.
+
+Image URLs must be HTTPS on port 443 with no credentials or fragments, and the host
+must be allowlisted, for example `MODERA_IMAGE_ALLOWED_HOSTS='["media.example.com"]'`.
+Downloads are off by default. Modera rejects private or internal DNS answers,
+redirects, environment proxies and compressed responses, and verifies TLS.
+Uploaded and downloaded images must decode as a still JPEG, PNG or WebP; the filename
+and MIME type are not trusted. Images are not stored.
 
 | Limit | Value |
 | --- | --- |
@@ -57,16 +56,13 @@ Body limits apply without `Content-Length`. Compressed bodies are unsupported.
 With a policy file, names and input types are checked; without one, only identifier
 syntax is validated. See [policy configuration](policies.md).
 
-Photo validation/preparation and inference run off the event loop. Each stage
-permits five waiting jobs by default, with up to two seconds of queue waiting
-within its deadline. Full queues return `503 service_busy`; expired waits return
-`503 queue_wait_timeout`. Timed-out native work keeps its slot until completion.
+Photo preparation and inference run off the event loop, with bounded queues; see
+[operations](operations.md#overload).
 
-Interrupted or stalled downloads restart once from byte zero with jitter; partial bytes
-are discarded. Each attempt resolves and validates the destination again. Permanent
-failures are not retried. Longer source `Retry-After` delays are returned to the caller
-instead of waiting inside the request. This is request-scoped recovery; progress does not survive
-a service restart.
+An interrupted or stalled download restarts once from byte zero with jitter, and each
+attempt resolves and validates the destination again. Permanent failures are not
+retried, and a source `Retry-After` longer than one second is returned to the caller
+instead of being waited out.
 
 ## Moderation result
 
@@ -142,13 +138,13 @@ Use `code`, not message text, for control flow. Validation reports the first err
 are omitted. Unexpected errors log only request ID and exception type. Errors include
 `Cache-Control: no-store`; their request ID matches the `X-Request-ID` header.
 
-Retryable means another attempt may succeed. Respect `Retry-After`, use bounded
-attempts with jitter and an overall deadline. A retry runs a new evaluation with
-a new request ID; requests are not deduplicated or replayed. Modera stores no
-result or business action, so retrying creates no duplicate moderation side effect.
-URL bytes and model/policy configuration can change between attempts. Pending
-work does not survive restart. OpenAPI: `/openapi.json` when enabled, with bearer
-authentication documented. Health checks and enabled documentation are unauthenticated.
+`retryable` means another attempt may succeed. Respect `Retry-After` and keep attempts
+bounded, with jitter and an overall deadline. A retry is a new evaluation with a new
+request ID, and the URL's bytes or the configuration can change between attempts; see
+[how it works](how-it-works.md#failures-and-retries).
+
+OpenAPI is served at `/openapi.json` when documentation is enabled. Health checks and
+the documentation pages need no key.
 
 When multiple image models are configured, model findings also contain `model`,
 matching an ID in `models`. Triggered composite rules contributing to the selected

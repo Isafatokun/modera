@@ -1,129 +1,89 @@
-# How Modera fits into your application
+# How it works
 
-Your backend sends one piece of text or one photo to Modera. Modera runs the
-configured checks, applies the selected policy and returns a decision with the
-information needed to interpret it. Your application decides whether to publish,
-hold for review or reject the content.
+Your backend sends one piece of text or one photo to Modera. Modera runs the checks
+the selected policy needs and returns a decision with the evidence behind it. Your
+application decides what to do next. Modera replies within the same request. It does
+not publish content, open review cases or store anything.
 
-Modera is a synchronous service: it replies within the same request. It does not
-publish content, create review cases, or keep a durable job/result store.
+## A request
 
-## Send an input and choose a policy
+All inputs go to `POST /v1/moderations` with a bearer key, which belongs in your
+backend and never in a browser or mobile client.
 
-All three input forms use `POST /v1/moderations` with a bearer API key. Keep that
-key in your backend, not in a browser or mobile client.
+| Input | Request |
+| --- | --- |
+| Text | JSON with `input.type` `text` and `input.text` |
+| Photo bytes | Multipart upload in `file` |
+| Photo URL | JSON with `input.type` `image` and an HTTPS URL. Needs an [allowlisted host](configuration.md). Uploading avoids the dependency on the media host. |
 
-| What you send | Request form | What Modera does |
-| --- | --- | --- |
-| Text | JSON with `input.type: text` and `input.text` | Validates the text and evaluates configured text checks. |
-| Photo bytes | Multipart `file` upload | Decodes and prepares a supported still photo before evaluating photo checks. |
-| Photo URL | JSON with `input.type: image` and an HTTPS URL source | Fetches from an explicitly allowed host, then handles the bytes like an upload. |
-
-Photo URLs are disabled until the operator configures an exact host allowlist.
-URL retrieval adds a dependency on the media host; upload directly if your backend
-already has the bytes. See [request examples and limits](api.md#requests).
-
-The `policy` field selects an operator-defined policy, defaulting to the name
-`default`. That name does not install a model or thresholds automatically. The
-operator must configure policies and the checks they need before use.
-
-## From request to response
-
-The diagram groups validation and media preparation to keep the caller's flow
-readable. Photo URL fetching and photo decoding happen before model inference.
-Authentication and request admission happen before body processing.
+The `policy` field names a policy the operator defined; it defaults to `default`.
+See [API](api.md#requests) for examples and limits.
 
 ```mermaid
 sequenceDiagram
     participant App as Your backend
-    participant API as Modera API
-    participant Checks as Configured checks
-    App->>API: Input + bearer key + policy name
-    API->>API: Check access, capacity, input and policy
-    alt Request cannot be evaluated
-        API-->>App: Error code + request ID, no decision
-    else Request ready
-        API->>Checks: Evaluate text or photo
-        Checks-->>API: Findings and coverage, or a failure
-        API->>API: Require complete results and apply policy
-        alt Evaluation completed
-            API-->>App: 200: allow, review or block + metadata
-        else Evaluation could not complete
-            API-->>App: Error with no decision and retry advice when applicable
-        end
+    participant API as Modera
+    participant Checks as Models and rules
+    App->>API: input, bearer key, policy name
+    API->>API: check access, capacity, input and policy
+    alt cannot be evaluated
+        API-->>App: error and request ID, no decision
+    else
+        API->>Checks: evaluate
+        Checks-->>API: findings, or a failure
+        API->>API: require complete results, apply policy
+        API-->>App: allow, review or block, or an error
     end
 ```
 
-Only models needed by the selected policy run. Configured text rules can evaluate
-literal phrases without an ML model. Scores are associated with category names;
-the policy defines which categories are required and which score thresholds mean
-review or block. A block threshold takes precedence over a review threshold.
-Missing required support or results produces an error, not an allow decision.
-See [policies](policies.md) and [model/rule configuration](models.md).
+Only the models the policy needs run. Text rules can match literal phrases without a
+model. The policy says which categories are required and which scores mean review or
+block, and block wins over review. If a required check is unsupported or its result is
+missing, the response is an error and never an allow. See [policies](policies.md) and
+[models](models.md).
 
-Operators prepare and load pinned model versions before serving. Models are
-reused across requests; they are not downloaded for each API call. No particular
-classifier or universal safety policy is selected automatically.
+## Reading the outcome
 
-## Interpret the outcome
+A `200` means the evaluation completed, not that the content was allowed.
 
-A `200` means an evaluation completed; it does not mean the content was allowed.
+| Response | Meaning |
+| --- | --- |
+| `200` `allow` | No configured check reached a threshold. |
+| `200` `review` | A review threshold was reached. Hold the content and open a review case in your application. |
+| `200` `block` | A block threshold was reached. Reject the content. |
+| error | There is no decision. Keep the content pending, fix the request or retry. |
 
-| Response | Meaning | What your application can do |
-| --- | --- | --- |
-| `200` + `allow` | The configured policy's checks passed. | Continue the application's publication flow if that meets its policy. |
-| `200` + `review` | A review threshold was reached. | Keep content unpublished and create a review case in your application. |
-| `200` + `block` | A block threshold was reached. | Reject the content according to your application's rules. |
-| Error response | No moderation decision is available. | Keep content pending; fix the request/configuration or retry when appropriate. |
+An `allow` covers only the configured checks. The result lists what ran:
 
-An allow covers only the configured checks. It is not a claim that all possible
-safety categories were assessed. The service reports what it evaluated so callers
-can make that distinction.
+- `decision`: the action and the categories that triggered it.
+- `findings` and `coverage`: scores with their source, and which categories were
+  evaluated, unsupported or not applicable.
+- `policy`, `models`, `rules_version`, `preprocessing_version`: the configuration
+  actually used.
+- `request_id`: identifies this evaluation.
 
-Successful results include:
+Scores are model outputs, not probabilities, and are not comparable across models.
+The [API page](api.md#moderation-result) has a full example.
 
-- `decision.action` and `decision.reasons`: the action and triggering categories.
-- `findings` and `coverage`: category scores, their model/rules source, and which
-  categories were evaluated, unsupported or not applicable.
-- `policy`, `models`, `rules_version` and `preprocessing_version`: the policy and
-  processing configuration actually used.
-- `request_id`: a correlation identifier for that evaluation.
+Text fallback is optional. When it applies, the result has `fallback: true` and the
+policy and coverage of the reduced rules-only evaluation. Decide how your
+application treats reduced coverage; the [Go example](../clients/go/cmd/moderate/README.md)
+sends a fallback `allow` to review and keeps a fallback `block` rejected.
 
-See the [full response example](api.md#moderation-result). Scores are model
-outputs, not guaranteed probabilities or interchangeable values across models.
+## Failures and retries
 
-Text fallback is optional and explicitly configured. A successful reduced
-rules-only evaluation returns `fallback: true` with the actual policy and coverage;
-it does not claim that unavailable model checks completed. Your application
-should decide how to handle reduced coverage. The
-[Go example](../clients/go/cmd/moderate/README.md) sends fallback allows to review
-and keeps fallback blocks rejected.
+Check `error.code` and `error.retryable`. Retry only retryable errors, honour
+`Retry-After`, and stay inside an overall deadline. Authentication, invalid input and a
+missing backend need a different fix. See [errors](api.md#errors).
 
-## When a check cannot finish
-
-Busy capacity, unavailable checks and some media-source failures may be retryable.
-Inspect the structured `error.code` and `error.retryable`; respect `Retry-After`
-when present and keep retries within an overall deadline. Authentication, invalid
-input and missing backend configuration require a different fix. See
-[error codes and retry semantics](api.md#errors).
-
-If the client times out or receives no valid response, keep the result pending
-too; do not infer an allow from the absence of an error body.
+If the client times out or gets no valid response, treat the content as pending.
 
 A retry is a new evaluation with a new request ID. Modera does not deduplicate
-requests or replay stored results. Your application owns the idempotency of later
-business actions, such as creating review cases or publishing content. Deduplicate
-those actions using your application's content ID, not Modera's per-request ID.
+requests or replay results, so make your own follow-up actions (publishing, opening a
+review case) idempotent, keyed on your content ID and not on Modera's request ID.
+In-flight work lives in the process and is lost on restart. See
+[operations](operations.md) for queues, metrics and shutdown.
 
-Submitted media and decisions are not stored as durable assets/results. In-flight
-work is process-local and does not survive restart. For queues, concurrency,
-metrics, shutdown and scale-out concerns, see [operations](operations.md).
-
-## Start integrating
-
-Start with the [API request examples](api.md#requests), or use the
-[Go SDK](../clients/go/README.md) and its
-[runnable application example](../clients/go/cmd/moderate/README.md). For a
-ready-to-run configuration with real text/photo models, use the
-[reference deployment](../deploy/reference/README.md); its model thresholds remain
-experimental and require independent quality validation for your content.
+To integrate, use the [Go client](../clients/go/README.md) or the
+[reference deployment](../deploy/reference/README.md). The reference thresholds are
+experimental; validate them on your own content first.
