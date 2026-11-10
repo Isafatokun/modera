@@ -62,7 +62,21 @@ target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "C901", "PLR0915"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+max-statements = 35
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["C901", "PLR0915"]
+"benchmarks/**" = ["C901", "PLR0915"]
+"deploy/**" = ["C901", "PLR0915"]
+"examples/**" = ["C901", "PLR0915"]
+"evaluation/**" = ["C901", "PLR0915"]
+"clients/**" = ["C901", "PLR0915"]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
