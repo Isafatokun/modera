@@ -8,7 +8,7 @@ Start from [example model configuration](../examples/ensemble-models.json) and
 [example policy](../examples/ensemble-policies.json). Replace the example model IDs,
 pinned revisions and native labels with your chosen models before preparation.
 These files demonstrate configuration; they are not a tested moderation profile.
-Use the same [prepare and run steps](models.md#classifiers).
+Use the same [prepare and run steps](models.md#set-up-classifiers).
 
 Give each model a different repository ID and separate category names, such as
 `detect.exposed` and `classify.sexual`. Scores are kept separate. A high detector
