@@ -146,6 +146,114 @@ def require_backend(
     return engine
 
 
+def resolve_json(payload: ModerationRequest) -> ResolvedInput:
+    if isinstance(payload.input, TextInput):
+        return ResolvedInput(payload.policy, InputSource.TEXT, payload.input.text)
+    return ResolvedInput(
+        payload.policy, InputSource.IMAGE_URL, str(payload.input.source.url)
+    )
+
+
+async def read_input(request: Request) -> ResolvedInput:
+    if request.headers.get("content-encoding", "identity").lower() != "identity":
+        raise APIError(
+            415,
+            "unsupported_content_encoding",
+            "Content encoding is not supported.",
+            headers={"Accept-Encoding": "identity"},
+        )
+    media_type = (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    )
+    try:
+        async with asyncio.timeout(BODY_TIMEOUT_SECONDS):
+            match media_type:
+                case "application/json":
+                    return resolve_json(await validate_json(request))
+                case "multipart/form-data":
+                    policy_name, image_data = await validate_upload(request)
+                    return ResolvedInput(
+                        policy_name, InputSource.IMAGE_UPLOAD, image_data
+                    )
+                case _:
+                    raise APIError(
+                        415,
+                        "unsupported_media_type",
+                        "The request content type is not supported.",
+                        headers={"Accept": "application/json, multipart/form-data"},
+                    )
+    except TimeoutError as exc:
+        raise APIError(
+            408,
+            "request_timeout",
+            "The request body deadline was exceeded.",
+            retryable=True,
+        ) from exc
+    except ValidationError as exc:
+        raise validation_error(exc) from exc
+
+
+async def fetch_image(
+    request: Request, resolved: ResolvedInput, engine: ModerationEngine | None
+) -> bytes:
+    if resolved.source is InputSource.IMAGE_UPLOAD:
+        if not isinstance(resolved.content, bytes):
+            raise TypeError("uploaded input must contain bytes")
+        return resolved.content
+    downloader = request.app.state.downloads
+    if downloader is None:
+        raise APIError(
+            503, "service_not_ready", "The service is not ready.", retryable=True
+        )
+    if not isinstance(resolved.content, str):
+        raise TypeError("URL input must contain a URL string")
+    url = HttpUrl(resolved.content)
+    downloader.check_allowed(url)
+    require_backend(request, engine, resolved.input_type)
+    data: bytes = await downloader.fetch(url)
+    return data
+
+
+async def prepare_image(
+    request: Request,
+    data: bytes,
+    engine: ModerationEngine | None,
+    *,
+    from_url: bool,
+) -> bytes | PreparedImage:
+    validator = request.app.state.images
+    if validator is None:
+        raise APIError(
+            503,
+            "service_not_ready",
+            "The service is not ready.",
+            retryable=True,
+            headers={"Retry-After": "1"},
+        )
+    try:
+        preprocessor = engine.image_preprocessor if engine is not None else None
+        if preprocessor is None:
+            await validator.validate(data)
+            return data
+        prepared: PreparedImage = await validator.prepare(data, preprocessor)
+        return prepared
+    except APIError as exc:
+        if from_url and exc.param == "file":
+            exc.param = "input.source.url"
+        raise
+
+
+async def prepare_content(
+    request: Request, resolved: ResolvedInput, engine: ModerationEngine | None
+) -> str | bytes | PreparedImage:
+    if resolved.source is InputSource.TEXT:
+        return resolved.content
+    data = await fetch_image(request, resolved, engine)
+    return await prepare_image(
+        request, data, engine, from_url=resolved.source is InputSource.IMAGE_URL
+    )
+
+
 @router.post(
     "/moderations",
     status_code=200,
@@ -182,102 +290,17 @@ def require_backend(
 )
 async def moderate(request: Request, response: Response) -> ModerationResult:
     response.headers["Cache-Control"] = "no-store"
-    resolved: ResolvedInput
-    if request.headers.get("content-encoding", "identity").lower() != "identity":
-        raise APIError(
-            415,
-            "unsupported_content_encoding",
-            "Content encoding is not supported.",
-            headers={"Accept-Encoding": "identity"},
-        )
-    media_type = (
-        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-    )
-    try:
-        async with asyncio.timeout(BODY_TIMEOUT_SECONDS):
-            match media_type:
-                case "application/json":
-                    payload = await validate_json(request)
-                    if isinstance(payload.input, TextInput):
-                        resolved = ResolvedInput(
-                            payload.policy, InputSource.TEXT, payload.input.text
-                        )
-                    else:
-                        resolved = ResolvedInput(
-                            payload.policy,
-                            InputSource.IMAGE_URL,
-                            str(payload.input.source.url),
-                        )
-                case "multipart/form-data":
-                    policy_name, image_data = await validate_upload(request)
-                    resolved = ResolvedInput(
-                        policy_name, InputSource.IMAGE_UPLOAD, image_data
-                    )
-                case _:
-                    raise APIError(
-                        415,
-                        "unsupported_media_type",
-                        "The request content type is not supported.",
-                        headers={"Accept": "application/json, multipart/form-data"},
-                    )
-    except TimeoutError as exc:
-        raise APIError(
-            408,
-            "request_timeout",
-            "The request body deadline was exceeded.",
-            retryable=True,
-        ) from exc
-    except ValidationError as exc:
-        raise validation_error(exc) from exc
-    policy_name = resolved.policy
-    input_type = resolved.input_type
-    content: str | bytes | PreparedImage = resolved.content
+    resolved = await read_input(request)
     if request.app.state.policies:
-        resolve_policy(request.app.state.policies, policy_name, input_type)
-    is_url = resolved.source is InputSource.IMAGE_URL
+        resolve_policy(request.app.state.policies, resolved.policy, resolved.input_type)
     engine: ModerationEngine | None = getattr(request.app.state, "engine", None)
-    if is_url:
-        downloader = request.app.state.downloads
-        if downloader is None:
-            raise APIError(
-                503, "service_not_ready", "The service is not ready.", retryable=True
-            )
-        if not isinstance(resolved.content, str):
-            raise TypeError("URL input must contain a URL string")
-        url = HttpUrl(resolved.content)
-        downloader.check_allowed(url)
-        require_backend(request, engine, input_type)
-        image_data = await downloader.fetch(url)
-    elif resolved.source is InputSource.IMAGE_UPLOAD:
-        if not isinstance(resolved.content, bytes):
-            raise TypeError("uploaded input must contain bytes")
-        image_data = resolved.content
-    if resolved.source is not InputSource.TEXT:
-        validator = request.app.state.images
-        if validator is None:
-            raise APIError(
-                503,
-                "service_not_ready",
-                "The service is not ready.",
-                retryable=True,
-                headers={"Retry-After": "1"},
-            )
-        try:
-            preprocessor = engine.image_preprocessor if engine is not None else None
-            if preprocessor is None:
-                await validator.validate(image_data)
-                content = image_data
-            else:
-                content = await validator.prepare(image_data, preprocessor)
-        except APIError as exc:
-            if is_url and exc.param == "file":
-                exc.param = "input.source.url"
-            raise
-        del image_data
-    engine = require_backend(request, engine, input_type)
-    policy = resolve_policy(request.app.state.policies, policy_name, input_type)
+    content = await prepare_content(request, resolved, engine)
+    engine = require_backend(request, engine, resolved.input_type)
+    policy = resolve_policy(
+        request.app.state.policies, resolved.policy, resolved.input_type
+    )
     result = await engine.evaluate(
-        input_type, content, policy, request.state.request_id
+        resolved.input_type, content, policy, request.state.request_id
     )
     request.app.state.metrics.observe_decision(result)
     return result
