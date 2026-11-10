@@ -3,6 +3,8 @@ import socket
 import ssl
 import subprocess
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
@@ -14,7 +16,12 @@ from pydantic import HttpUrl, ValidationError
 
 from modera import downloads
 from modera.config import Settings
-from modera.downloads import ImageDownloader, PublicResolver, require_public
+from modera.downloads import (
+    ImageDownloader,
+    PublicResolver,
+    require_public,
+    retry_after_seconds,
+)
 from modera.errors import APIError
 
 
@@ -425,3 +432,30 @@ def test_source_retry_after_is_preserved(monkeypatch: pytest.MonkeyPatch) -> Non
         assert calls == 1
 
     asyncio.run(with_source(handler, check))
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("5", 5),
+        ("0", 1),
+        ("999999", 86400),
+        ("", None),
+        ("soon", None),
+        ("-3", None),
+        ("\u0663", None),
+    ],
+)
+def test_retry_after_seconds_accepts_only_sensible_values(
+    value: str, expected: int | None
+) -> None:
+    assert retry_after_seconds(value) == expected
+
+
+def test_retry_after_seconds_reads_http_dates() -> None:
+    soon = datetime.now(UTC) + timedelta(seconds=30)
+    assert retry_after_seconds(format_datetime(soon, usegmt=True)) in range(29, 32)
+    past = datetime.now(UTC) - timedelta(hours=1)
+    assert retry_after_seconds(format_datetime(past, usegmt=True)) == 1
+    far = datetime.now(UTC) + timedelta(days=30)
+    assert retry_after_seconds(format_datetime(far, usegmt=True)) == 86400
