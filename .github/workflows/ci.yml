@@ -79,7 +79,7 @@ jobs:
       - run: uv sync --locked --group benchmark
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy evaluation clients/go/integration.py clients/go/consumer_check.py
+      - run: uv run --locked --group benchmark mypy src tests benchmarks examples deploy evaluation .github/scripts clients/go/integration.py clients/go/consumer_check.py
       - name: Check benchmark entry points
         run: |
           uv run --locked --group benchmark python benchmarks/run.py --help
@@ -153,59 +153,8 @@ jobs:
       - run: >-
           curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1
           --retry-max-time 30 --max-time 2 http://127.0.0.1:8000/health/ready
-      - name: Verify container authentication
-        run: |
-          docker exec -i modera python - <<'PY'
-          import json
-          import os
-          from io import BytesIO
-          import urllib.error
-          import urllib.request
-          from PIL import Image
-
-          for authenticated, status, code in [
-              (False, 401, "authentication_required"),
-              (True, 501, "moderation_not_implemented"),
-          ]:
-              headers = {"Content-Type": "application/json"}
-              if authenticated:
-                  headers["Authorization"] = "Bearer " + os.environ["MODERA_API_KEY"]
-              request = urllib.request.Request(
-                  "http://127.0.0.1:8000/v1/moderations",
-                  data=b'{"input":{"type":"text","text":"hello"}}', headers=headers,
-              )
-              try:
-                  urllib.request.urlopen(request, timeout=5)
-              except urllib.error.HTTPError as response:
-                  assert response.code == status
-                  body = json.load(response)["error"]
-                  assert body["code"] == code
-                  assert body["request_id"] == response.headers["X-Request-ID"]
-              else:
-                  raise AssertionError("expected an error response")
-          print("Container authentication checks passed")
-          for image_format in ("JPEG", "PNG", "WEBP"):
-              with BytesIO() as buffer, Image.new("RGB", (2, 2), "white") as image:
-                  image.save(buffer, format=image_format)
-                  data = buffer.getvalue()
-              body = (
-                  b'--smoke\r\nContent-Disposition: form-data; name="file"; filename="image"\r\n'
-                  b'Content-Type: application/octet-stream\r\n\r\n' + data + b'\r\n--smoke--\r\n'
-              )
-              request = urllib.request.Request(
-                  "http://127.0.0.1:8000/v1/moderations", data=body,
-                  headers={"Authorization": "Bearer " + os.environ["MODERA_API_KEY"],
-                           "Content-Type": "multipart/form-data; boundary=smoke"},
-              )
-              try:
-                  urllib.request.urlopen(request, timeout=10)
-              except urllib.error.HTTPError as response:
-                  assert response.code == 501
-                  assert json.load(response)["error"]["code"] == "moderation_not_implemented"
-              else:
-                  raise AssertionError("expected moderation to remain unimplemented")
-          print("Container image codec checks passed")
-          PY
+      - name: Verify container authentication and image codecs
+        run: docker exec -i modera python - < .github/scripts/check_unconfigured_container.py
       - name: Verify rules-only container
         run: |
           export MODERA_API_KEY="$(openssl rand -hex 32)"
@@ -216,37 +165,7 @@ jobs:
             -v "$PWD/examples/policies.json:/etc/modera/policies.json:ro" \
             -v "$PWD/examples/text-rules.json:/etc/modera/text-rules.json:ro" \
             modera:ci
-          docker exec -i modera-rules python - <<'PY'
-          import json
-          import os
-          import time
-          import urllib.error
-          import urllib.request
-
-          for attempt in range(20):
-              try:
-                  urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=2).close()
-                  break
-              except (urllib.error.URLError, TimeoutError, ConnectionError):
-                  time.sleep(0.5)
-          else:
-              raise AssertionError("rules container did not become ready")
-          request = urllib.request.Request(
-              "http://127.0.0.1:8000/v1/moderations",
-              data=json.dumps({"input":{"type":"text","text":"example prohibited phrase"},
-                               "policy":"rules-only"}).encode(),
-              headers={"Authorization":"Bearer " + os.environ["MODERA_API_KEY"],
-                       "Content-Type":"application/json"},
-          )
-          with urllib.request.urlopen(request, timeout=5) as response:
-              result = json.load(response)
-              assert response.status == 200
-              assert result["decision"]["action"] == "block"
-              assert result["models"] == []
-              assert result["rules_version"] == "1"
-              assert result["findings"][0]["source"] == "rules"
-          print("Rules-only container checks passed")
-          PY
+          docker exec -i modera-rules python - < .github/scripts/check_rules_container.py
       - if: always()
         run: docker logs modera
       - if: always()
