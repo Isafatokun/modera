@@ -224,3 +224,25 @@ def test_cancellation_after_grant_passes_the_slot_to_the_next_waiter(
             worker.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_slot_is_free_when_the_caller_resumes(fails: bool) -> None:
+    def job() -> int:
+        if fails:
+            raise ValueError("boom")
+        return 1
+
+    async def run() -> None:
+        worker = BoundedWorker("test")
+        try:
+            for _ in range(300):
+                try:
+                    await worker.run(job)
+                except ValueError:
+                    assert fails
+                assert worker.capacity == (0, 0)
+        finally:
+            worker.close()
+
+    asyncio.run(run())

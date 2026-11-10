@@ -261,6 +261,7 @@ class ModerationEngine:
                             input_type != TEXT
                             or self._settings.text_fallback != "rules"
                             or exc.status_code != 503
+                            or exc.code != "check_unavailable"
                         ):
                             raise
                         fallback = True

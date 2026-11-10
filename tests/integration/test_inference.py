@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from threading import Event, Thread
 from typing import TypedDict
 
 import pytest
@@ -482,3 +483,51 @@ def test_detector_configuration_uses_shared_policy_and_provenance(
         assert result["decision"]["action"] == "block"
         assert result["coverage"]["evaluated"] == ["sexual"]
         assert result["models"] == [{"id": "example/detector", "revision": REVISION}]
+
+
+def test_busy_text_worker_is_not_treated_as_a_model_outage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    started, release = Event(), Event()
+
+    class BlockingClassifier(FakeClassifier):
+        def predict(self, content: str | bytes) -> list[Finding]:
+            started.set()
+            assert release.wait(10)
+            return super().predict(content)
+
+    values = configuration(tmp_path, model_required=True)
+    payload = json.loads(values["policy_file"].read_text())
+    payload["policies"].append(
+        {
+            "id": "degraded",
+            "version": "2",
+            "text": [{"category": "rules.blocklist", "block_threshold": 1.0}],
+        }
+    )
+    values["policy_file"].write_text(json.dumps(payload))
+    monkeypatch.setattr(engine, "create_adapter", BlockingClassifier)
+    settings = Settings(
+        **values,
+        text_model=TextModelSettings(
+            id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+        ),
+        text_fallback="rules",
+        text_fallback_policy="degraded",
+    )
+    body = {"input": {"type": "text", "text": "ordinary"}}
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        first = Thread(target=lambda: client.post("/v1/moderations", json=body))
+        first.start()
+        try:
+            assert started.wait(5)
+            response = client.post("/v1/moderations", json=body)
+            assert response.status_code == 503
+            error = response.json()["error"]
+            assert error["code"] == "service_busy"
+            assert error["retryable"]
+            assert response.headers["Retry-After"] == "1"
+            assert "decision" not in response.json()
+        finally:
+            release.set()
+            first.join(10)
