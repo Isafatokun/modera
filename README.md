@@ -1,5 +1,7 @@
 # Modera
 
+[![CI](https://github.com/Isafatokun/modera/actions/workflows/ci.yml/badge.svg)](https://github.com/Isafatokun/modera/actions/workflows/ci.yml)
+
 A self-hosted moderation API for text and photos.
 
 You send one item and name a policy. Modera runs the checks that policy needs and
@@ -87,8 +89,9 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Source is in `src/modera`, tests in `tests/`. [Benchmarks](benchmarks/README.md)
-measure capacity with real models. See [releasing](docs/releasing.md) for maintainers.
+Source is in `src/modera`, tests in `tests/`. See [CONTRIBUTING](CONTRIBUTING.md) for the
+full checks and [SECURITY](SECURITY.md) to report a vulnerability. [Benchmarks](benchmarks/README.md)
+measure capacity with real models, and [releasing](docs/releasing.md) is for maintainers.
 
 ## Licence
 
