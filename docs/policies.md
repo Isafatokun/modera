@@ -49,4 +49,4 @@ No file or thresholds are installed by default. Configuring any moderation backe
 requires a policy file; unconfigured modalities return `501`.
 
 For image-wide combinations of evidence from different models, see
-[combining models](combining-models.md). Existing individual thresholds still apply.
+[combining models](image-models.md#combine-image-models). Existing individual thresholds still apply.

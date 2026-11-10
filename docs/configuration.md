@@ -16,7 +16,7 @@ backend returns `501`.
 | `MODERA_MODEL_FILE` | unset | Path to a [model](models.md) JSON file. Cannot be combined with the individual model settings below. |
 | `MODERA_TEXT_MODEL__*` | unset | One text classifier: `ID`, `REVISION` (full commit SHA), `LABEL_MAP`, `ACTIVATION`, `MAX_TOKENS`, `CACHE_DIR`. |
 | `MODERA_IMAGE_MODEL__*` | unset | One photo model, with the same fields. |
-| `MODERA_IMAGE_MODELS` | unset | JSON array of up to four photo models; see [combining models](combining-models.md). Not valid together with `MODERA_IMAGE_MODEL`. |
+| `MODERA_IMAGE_MODELS` | unset | JSON array of up to four photo models; see [combining models](image-models.md#combine-image-models). Not valid together with `MODERA_IMAGE_MODEL`. |
 | `MODERA_TEXT_RULES_FILE` | unset | Literal phrase rules, usable without a model. See [rules and fallback](models.md#text-rules-and-fallback). |
 | `MODERA_TEXT_FALLBACK` | `error` | `rules` lets text fall back to rules when the text model is unavailable. |
 | `MODERA_TEXT_FALLBACK_POLICY` | unset | Rules-only policy applied during fallback. Requires `MODERA_TEXT_FALLBACK=rules`. |

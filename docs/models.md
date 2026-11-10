@@ -6,8 +6,7 @@ classifiers and compatible photo detectors; generative guards are not supported.
 model is selected for you, so validate category meanings, language coverage and
 thresholds before you change models.
 
-Related: [ONNX detectors](onnx.md), [object detectors](detectors.md) and
-[combining models](combining-models.md).
+Related: [object detectors, ONNX and combined models](image-models.md).
 
 ## Set up classifiers
 

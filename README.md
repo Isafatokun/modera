@@ -77,6 +77,7 @@ application owns those, including retrying safely: a retry is a new evaluation.
 | [Configuration](docs/configuration.md) | Every setting |
 | [Policies](docs/policies.md) | Thresholds and required checks |
 | [Models](docs/models.md) | Choosing, preparing and replacing models |
+| [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
 | [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
 | [Evaluation](evaluation/README.md) | Checking a policy on your own labelled photos |
 
