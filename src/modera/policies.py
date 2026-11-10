@@ -165,17 +165,38 @@ def evaluate_policy(
     scores = {finding.category: finding.score for finding in findings}
     if len(scores) != len(findings) or set(scores) != set(coverage.evaluated):
         raise ValueError("findings must match evaluated coverage exactly")
-    rules = policy.rules_for(input_type)
-    if not policy.categories_for(input_type):
+    require_complete_evaluation(policy, input_type, scores, coverage)
+    composites = policy.image_composites if input_type == IMAGE else ()
+    applicable = [
+        rule for rule in policy.rules_for(input_type) if rule.category in scores
+    ]
+    if not applicable and not composites:
+        raise APIError(
+            400,
+            "policy_not_applicable",
+            "No policy checks apply to this input.",
+            param="policy",
+        )
+    matched = [rule for rule in composites if composite_fires(rule, scores)]
+    return decide(applicable, matched, scores)
+
+
+def require_complete_evaluation(
+    policy: Policy,
+    input_type: InputType,
+    scores: Mapping[str, float],
+    coverage: Coverage,
+) -> None:
+    categories = policy.categories_for(input_type)
+    if not categories:
         raise APIError(
             400,
             "policy_not_applicable",
             "The policy does not support this input type.",
             param="policy",
         )
-
     required = policy.categories_for(input_type, required_only=True)
-    for category in policy.categories_for(input_type):
+    for category in categories:
         if category in scores:
             continue
         if category in coverage.unsupported or category in coverage.not_applicable:
@@ -195,21 +216,17 @@ def evaluate_policy(
             headers={"Retry-After": "2"},
         )
 
-    composites = policy.image_composites if input_type == IMAGE else ()
-    matched = []
-    for composite in composites:
-        conditions = [scores[c.category] >= c.min for c in composite.conditions]
-        fires = all(conditions) if composite.all_of else any(conditions)
-        if fires:
-            matched.append(composite)
-    applicable = [rule for rule in rules if rule.category in scores]
-    if not applicable and not composites:
-        raise APIError(
-            400,
-            "policy_not_applicable",
-            "No policy checks apply to this input.",
-            param="policy",
-        )
+
+def composite_fires(rule: ImageComposite, scores: Mapping[str, float]) -> bool:
+    conditions = [scores[c.category] >= c.min for c in rule.conditions]
+    return all(conditions) if rule.all_of else any(conditions)
+
+
+def decide(
+    applicable: Sequence[PolicyRule],
+    matched: Sequence[ImageComposite],
+    scores: Mapping[str, float],
+) -> Decision:
     blocked = [
         rule.category
         for rule in applicable
