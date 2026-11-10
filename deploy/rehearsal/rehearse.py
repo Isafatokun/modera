@@ -348,7 +348,7 @@ class Rehearsal:
         self.report["checks"].append({"name": name, **evidence})
         print(name + ": passed", flush=True)
 
-    def execute(self, cache: Path, download: bool) -> None:
+    def prepare(self, cache: Path, download: bool) -> None:
         models = json.loads((ROOT / "deploy/reference/models.json").read_text())
         for model in models.values():
             model["cache_dir"] = str(cache.resolve())
@@ -395,18 +395,19 @@ class Rehearsal:
         )
         with Image.new("RGB", (32, 32), "white") as photo:
             photo.save(self.output / "photo.png")
+
+    def check_round_robin(self) -> dict[str, Any]:
         self.start("a")
         self.start("b")
         self.route(["a", "b"])
-        seen = set()
-        baseline = None
-        for _ in range(4):
-            baseline, trace = self.success(self.submit(image=True), "image")
-            seen.add(trace[0]["upstream"])
+        results = [self.success(self.submit(image=True), "image") for _ in range(4)]
+        seen = {trace[0]["upstream"] for _, trace in results}
         require(len(seen) == 2, "both instances were not used")
         self.success(self.submit(), "text")
         self.check("real_models_and_round_robin", upstreams=sorted(seen))
+        return results[-1][0]
 
+    def check_overload_and_retry(self) -> None:
         self.route(["a"])
         control = self.arm()
         pending = self.submit(image=True)
@@ -443,6 +444,7 @@ class Rehearsal:
         )
         self.check("bounded_overload_and_sdk_retry", attempts=trace)
 
+    def check_removal_and_drain(self) -> None:
         control = self.arm()
         pending = self.submit(image=True)
         self.active(control, pending)
@@ -472,17 +474,18 @@ class Rehearsal:
             fresh_requests_to_remaining_instance=5,
         )
 
+    def check_restart_and_rejoin(self, baseline: dict[str, Any]) -> None:
         self.start("a", stubborn_exit=True)
         self.route(["a"])
         restarted, _ = self.success(self.submit(image=True), "image")
         require(
-            baseline is not None
-            and restarted["findings"] == baseline["findings"]
+            restarted["findings"] == baseline["findings"]
             and restarted["request_id"] != baseline["request_id"],
             "restart changed findings or reused request ID",
         )
         self.check("restart_and_rejoin")
 
+    def check_forced_termination(self) -> None:
         control = self.arm()
         pending = self.submit(image=True)
         self.active(control, pending)
@@ -515,6 +518,7 @@ class Rehearsal:
             interrupted_request=failed,
         )
 
+    def check_clean_shutdown(self) -> None:
         gateway = self.gateway
         if gateway is None:
             raise RuntimeError("missing gateway")
@@ -529,6 +533,15 @@ class Rehearsal:
             "remaining instance shutdown failed",
         )
         self.check("clean_shutdown")
+
+    def execute(self, cache: Path, download: bool) -> None:
+        self.prepare(cache, download)
+        baseline = self.check_round_robin()
+        self.check_overload_and_retry()
+        self.check_removal_and_drain()
+        self.check_restart_and_rejoin(baseline)
+        self.check_forced_termination()
+        self.check_clean_shutdown()
         self.report["status"] = "passed"
 
 
