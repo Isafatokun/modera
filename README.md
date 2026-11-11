@@ -9,8 +9,11 @@ returns `allow`, `review` or `block`, along with the scores and settings behind 
 decision. The models detect, the policy decides, and your application acts. Two
 products can use the same models and treat the findings differently.
 
-Modera is experimental. The reference models and thresholds are examples, not a
-claim about moderation accuracy for your content.
+Modera is experimental, and its accuracy is modest. Measured on two public labelled
+text datasets, no reference model reaches a 90% recall / 5% false-flag target: the best
+catch 32% (French) and 48% (English) of toxic text at about 5% false flags. See
+[accuracy](docs/accuracy.md) for the method, the numbers and the limits. Photo accuracy
+has not been measured.
 
 ## Quick start
 
@@ -79,8 +82,9 @@ application owns those, including retrying safely: a retry is a new evaluation.
 | [Models](docs/models.md) | Choosing, preparing and replacing models |
 | [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
 | [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
+| [Accuracy](docs/accuracy.md) | Measured text accuracy, calibration and review load |
 | [Verification](docs/verification.md) | What is tested, how to run it, and what is not shown |
-| [Evaluation](evaluation/README.md) | Checking a policy on your own labelled photos |
+| [Evaluation](evaluation/README.md) | Reproducing the text numbers, and checking a policy on your own photos |
 
 ## Development
 
