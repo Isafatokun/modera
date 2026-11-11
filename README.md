@@ -71,12 +71,27 @@ For real text and photo models, use the [Docker Compose setup](deploy/reference/
 Modera does not publish content, keep a review queue or store results. Your
 application owns those, including retrying safely: a retry is a new evaluation.
 
+## Why not a hosted API?
+
+Hosted moderation services already detect a lot. [OpenAI's moderation endpoint](https://developers.openai.com/api/docs/guides/moderation)
+returns per-category flags and scores, [AWS Rekognition](https://docs.aws.amazon.com/rekognition/latest/APIReference/API_DetectModerationLabels.html)
+returns labels above a minimum confidence you set, [Google SafeSearch](https://docs.cloud.google.com/vision/docs/detecting-safe-search)
+returns likelihood levels, and [Azure AI Content Safety](https://learn.microsoft.com/en-us/azure/ai-services/content-safety/how-to/use-blocklist)
+lets you add your own text blocklists. In each case your content is sent to the provider.
+OpenAI's guide tells you to treat its scores as signals for your own policy and to expect
+to recalibrate them, and AWS's tells you to use the returned labels to decide which
+content is appropriate.
+
+Modera is for when you want that decision to be a versioned, testable policy that sits
+next to the models, with content that stays in your deployment. The price is that you run
+the models, and the accuracy is yours to measure. The reference models are not good enough
+on their own; see [accuracy](docs/accuracy.md).
+
 ## Documentation
 
 | | |
 | --- | --- |
-| [How it works](docs/how-it-works.md) | Request flow and how to use a result |
-| [API](docs/api.md) | Requests, responses and errors |
+| [API](docs/api.md) | Requests, results, errors, and how to act on them |
 | [Configuration](docs/configuration.md) | Every setting |
 | [Policies](docs/policies.md) | Thresholds and required checks |
 | [Models](docs/models.md) | Choosing, preparing and replacing models |

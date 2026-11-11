@@ -2,9 +2,10 @@
 
 `POST /v1/moderations` — `Authorization: Bearer <api-key>` required.
 
-See [how it works](how-it-works.md) for the flow and your responsibilities as the
-caller. An input type with no model or rules backend returns
-`501 moderation_not_implemented`; see [models](models.md).
+Modera replies within the same request. It does not publish content, open review cases
+or store anything, so what happens next is your application's job; see
+[using the result](#using-the-result). An input type with no model or rules backend
+returns `501 moderation_not_implemented`; see [models](models.md).
 
 ## Requests
 
@@ -104,6 +105,26 @@ for rules-only results. `fallback: true` identifies degraded evaluation; `policy
 records the policy actually used. The preprocessing version fingerprints model
 settings, label mappings, and rule configuration. See [fallback semantics](models.md).
 
+## Using the result
+
+A `200` means the evaluation completed, not that the content was allowed.
+
+| Response | What your application does |
+| --- | --- |
+| `200` `allow` | No configured check reached a threshold. Continue your normal flow if your own rules agree. |
+| `200` `review` | Hold the content and open a review case. Modera does not create one. |
+| `200` `block` | Reject the content. |
+| error | There is no decision. Keep the content pending, fix the request, or retry. Never treat an error or a timeout as an `allow`. |
+
+An `allow` covers only the checks the policy configured, and `coverage` lists exactly what
+ran. Only the models the policy needs run. A required check that is unsupported, or has no
+result, is an error and never an allow, and a block threshold wins over a review one.
+
+Text fallback is optional. When it applies, the result has `fallback: true`, and the
+policy and coverage are those of the reduced rules-only evaluation. Decide how your
+application treats reduced coverage; the [Go example](../clients/go/cmd/moderate/README.md)
+sends a fallback `allow` to review and keeps a fallback `block` rejected.
+
 ## Errors
 
 ```json
@@ -138,10 +159,20 @@ Use `code`, not message text, for control flow. Validation reports the first err
 are omitted. Unexpected errors log only request ID and exception type. Errors include
 `Cache-Control: no-store`; their request ID matches the `X-Request-ID` header.
 
-`retryable` means another attempt may succeed. Respect `Retry-After` and keep attempts
-bounded, with jitter and an overall deadline. A retry is a new evaluation with a new
-request ID, and the URL's bytes or the configuration can change between attempts; see
-[how it works](how-it-works.md#failures-and-retries).
+`retryable` means another attempt may succeed. `Retry-After` is a minimum wait, not a
+schedule. The server sends 1 second for busy, not-ready and timeout errors, 2 seconds when
+a policy check did not complete, and passes on a longer delay from a photo source. Every
+caller rejected at the same moment gets the same value, so clients that sleep exactly that
+long come back together and overload the service again. Wait at least `Retry-After`, add
+jitter on top, back off on repeated failures, bound the attempts and keep inside an
+overall deadline. The Go client does this.
+
+If the client times out or gets no valid response, treat the content as pending. A retry
+is a new evaluation with a new request ID, and the URL's bytes or the configuration can
+change between attempts. Modera does not deduplicate requests or replay results, so make
+your own follow-up actions (publishing, opening a review case) idempotent, keyed on your
+content ID and not on Modera's request ID. In-flight work lives in the process and is lost
+on restart; see [operations](operations.md).
 
 OpenAPI is served at `/openapi.json` when documentation is enabled. Health checks and
 the documentation pages need no key.
