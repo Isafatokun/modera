@@ -2,12 +2,15 @@
 
 [![CI](https://github.com/Isafatokun/modera/actions/workflows/ci.yml/badge.svg)](https://github.com/Isafatokun/modera/actions/workflows/ci.yml)
 
-A self-hosted moderation API for text and photos.
+An experimental, self-hosted, policy-driven moderation API for text and photos.
 
 You send one item and name a policy. Modera runs the checks that policy needs and
 returns `allow`, `review` or `block`, with the scores behind the decision. The models
 detect, the policy decides, and your application acts. Two products can use the same
 models and treat the findings differently.
+
+Start with phrase rules, then configure compatible models, label mappings, and
+policies for your product. Supporting a new model type requires code.
 
 **Status: experimental.** On two public labelled text datasets, none of the six models
 tested catches 90% of toxic text at 5% false flags. The best catch 32% (French) and 48%
