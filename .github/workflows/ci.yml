@@ -84,6 +84,7 @@ jobs:
         run: |
           uv run --locked python -m evaluation.photos --help
           uv run --locked python -m evaluation.text --help
+          uv run --locked python -m evaluation.cutoffs --help
       - run: uv run --locked pytest
       - run: uv build
 
