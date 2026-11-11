@@ -103,7 +103,9 @@ export MODERA_TEXT_FALLBACK_POLICY=rules-only
 - The fallback policy may contain only configured rule categories. The result shows the
   policy actually used, `fallback: true` and `models: []`.
 - Without a fallback policy, the requested policy still applies, so missing model
-  checks return `503` even if no rule matched.
+  checks are an error even if no rule matched. A model that is loaded but failing or
+  slow returns a retryable `503`. A model that never loaded returns
+  `500 model_not_loaded`, which is not retryable because only a restart can fix it.
 - A busy text worker is load, not an outage. It returns `503 service_busy` with
   `Retry-After` and never falls back. Invalid input, invalid model output and internal
   inference errors never fall back either.
