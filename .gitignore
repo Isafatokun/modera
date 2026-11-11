@@ -12,10 +12,8 @@ build/
 .env
 .env.*
 !.env.example
-loadtests/results/
 model-cache/
 evaluation/data/
 evaluation/results/
 reference-verification/
 
-rehearsal-verification/

@@ -423,10 +423,6 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
-loadtest = [
-    { name = "httpx2" },
-    { name = "numpy" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -454,10 +450,6 @@ dev = [
     { name = "mypy", specifier = ">=1.0,<2" },
     { name = "pytest", specifier = ">=9,<10" },
     { name = "ruff", specifier = ">=0.17,<0.18" },
-]
-loadtest = [
-    { name = "httpx2", specifier = ">=2.16.0" },
-    { name = "numpy", specifier = ">=2,<3" },
 ]
 
 [[package]]
