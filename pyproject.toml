@@ -73,9 +73,7 @@ max-statements = 35
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["C901", "PLR0915"]
-"e2e/**" = ["C901", "PLR0915"]
 "examples/**" = ["C901", "PLR0915"]
-"evaluation/**" = ["C901", "PLR0915"]
 "clients/**" = ["C901", "PLR0915"]
 
 [tool.mypy]

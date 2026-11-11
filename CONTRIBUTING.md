@@ -1,11 +1,11 @@
 # Contributing
 
-Thanks for taking a look. Small, focused pull requests are easiest to review.
+Small, focused pull requests are easiest to review.
 
 ## Setup
 
-You need Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-Go 1.23 or later is needed only for `clients/go`.
+You need Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/). Go
+1.23 or later is needed only for `clients/go`.
 
 ```sh
 uv sync --locked
@@ -37,14 +37,8 @@ For the Go client, run `go test -race ./...` and `go vet ./...` in `clients/go`.
 - Keep functions short. Ruff enforces a complexity limit on `src/`.
 - Update the docs when behaviour changes, and keep them to the point.
 - Say what you ran, and what you could not run, in the pull request.
-- Model accuracy is not something unit tests can show. Do not claim it without
-  evidence from your own labelled data, and see the
-  [evaluation harness](evaluation/README.md).
+- Don't claim model accuracy without evidence from labelled data. Unit tests can't show it.
 
-[AGENTS.md](AGENTS.md) describes the review passes the maintainers apply before a change
-is published.
-
-## Reporting problems
-
-Open an issue for bugs and ideas. For a security problem, follow
-[SECURITY.md](SECURITY.md) instead of opening a public issue.
+[AGENTS.md](AGENTS.md) describes the review passes maintainers apply before a change is
+published. For a security problem, follow [SECURITY.md](SECURITY.md) instead of opening a
+public issue.

@@ -103,7 +103,7 @@ Each finding includes `source: "model"` or `"rules"`. Rule results include
 `rules_version`; `models` lists only models that completed evaluation and can be empty
 for rules-only results. `fallback: true` identifies degraded evaluation; `policy`
 records the policy actually used. The preprocessing version fingerprints model
-settings, label mappings, and rule configuration. See [fallback semantics](models.md).
+settings, label mappings, and rule configuration. See [fallback](models.md#fallback).
 
 ## Using the result
 
@@ -122,7 +122,7 @@ result, is an error and never an allow, and a block threshold wins over a review
 
 Text fallback is optional. When it applies, the result has `fallback: true`, and the
 policy and coverage are those of the reduced rules-only evaluation. Decide how your
-application treats reduced coverage; the [Go example](../clients/go/cmd/moderate/README.md)
+application treats reduced coverage; the [reference upload gate](../examples/upload_gate.py)
 sends a fallback `allow` to review and keeps a fallback `block` rejected.
 
 ## Errors
