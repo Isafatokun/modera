@@ -5,20 +5,19 @@
 A self-hosted moderation API for text and photos.
 
 You send one item and name a policy. Modera runs the checks that policy needs and
-returns `allow`, `review` or `block`, along with the scores and settings behind the
-decision. The models detect, the policy decides, and your application acts. Two
-products can use the same models and treat the findings differently.
+returns `allow`, `review` or `block`, with the scores behind the decision. The models
+detect, the policy decides, and your application acts. Two products can use the same
+models and treat the findings differently.
 
-Modera is experimental, and its accuracy is modest. Measured on two public labelled
-text datasets, no reference model reaches a 90% recall / 5% false-flag target: the best
-catch 32% (French) and 48% (English) of toxic text at about 5% false flags. See
-[accuracy](docs/accuracy.md) for the method, the numbers and the limits. Photo accuracy
-has not been measured.
+**Status: experimental.** On two public labelled text datasets, none of the six models
+tested catches 90% of toxic text at 5% false flags. The best catch 32% (French) and 48%
+(English) at about 5%. See [accuracy](docs/accuracy.md). Photo accuracy is unmeasured,
+and no product uses Modera yet.
 
 ## Quick start
 
 You need Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
-This demo matches literal phrases, so it downloads no model.
+This demo matches literal phrases and downloads no model.
 
 ```sh
 uv sync --locked
@@ -51,42 +50,43 @@ curl http://127.0.0.1:8000/v1/moderations \
 }
 ```
 
-For real text and photo models, see [Models](docs/models.md#set-up-classifiers).
-[Start here](docs/start-here.md) covers both paths and common problems.
+## Real models
+
+Prepare the pinned weights once, then start the service with a model file:
+
+```sh
+uv sync --locked --extra inference
+uv run --locked --extra inference python -m modera.prepare_models --config examples/models.json
+export MODERA_API_KEY="$(openssl rand -hex 32)"
+export MODERA_MODEL_FILE=examples/models.json
+export MODERA_POLICY_FILE=examples/policies.json
+uv run --locked --extra inference uvicorn modera.main:create_app --factory
+```
+
+Upload a photo with `curl ... -F 'file=@photo.jpg'` against the same endpoint. The
+example models and thresholds are placeholders. See [models](docs/models.md).
 
 ## What it does
 
 - Takes text, a photo upload, or an HTTPS photo URL from hosts you allow.
-- Applies named, versioned [policies](docs/policies.md): per-category thresholds,
-  required checks, and rules that combine several models.
-- Reports what it evaluated. A missing check is never returned as an `allow`, and an
-  evaluation that cannot finish returns an error, not a decision.
-- Runs local classifiers and detectors on CPU. Models are pinned to a commit and
-  loaded offline.
-- Exposes health checks and Prometheus metrics, bounds its queues, and drains
-  requests on shutdown.
-- Ships a [Go client](clients/go/README.md) and a tested
-  [reference upload gate](examples/upload_gate.py) showing how an application keeps
-  an upload private until a completed decision arrives.
+- Applies named, versioned [policies](docs/policies.md): thresholds, required checks, and
+  rules that combine several photo models.
+- Reports what it evaluated. A check that did not finish is an error, never an `allow`.
+- Runs pinned local models on CPU, loaded offline. Content stays in your deployment.
+- Exposes health checks and Prometheus metrics, bounds its queues, and drains on shutdown.
 
-Modera does not publish content, keep a review queue or store results. Your
-application owns those, including retrying safely: a retry is a new evaluation.
+It does not publish content, keep a review queue or store results. Your application owns
+those, and a retry is a new evaluation. [`examples/upload_gate.py`](examples/upload_gate.py)
+shows an upload that stays private until a completed decision arrives. A
+[Go client](clients/go/README.md) is included.
 
 ## Why not a hosted API?
 
-Hosted moderation services already detect a lot. [OpenAI's moderation endpoint](https://developers.openai.com/api/docs/guides/moderation)
-returns per-category flags and scores, [AWS Rekognition](https://docs.aws.amazon.com/rekognition/latest/APIReference/API_DetectModerationLabels.html)
-returns labels above a minimum confidence you set, [Google SafeSearch](https://docs.cloud.google.com/vision/docs/detecting-safe-search)
-returns likelihood levels, and [Azure AI Content Safety](https://learn.microsoft.com/en-us/azure/ai-services/content-safety/how-to/use-blocklist)
-lets you add your own text blocklists. In each case your content is sent to the provider.
-OpenAI's guide tells you to treat its scores as signals for your own policy and to expect
-to recalibrate them, and AWS's tells you to use the returned labels to decide which
-content is appropriate.
-
-Modera is for when you want that decision to be a versioned, testable policy that sits
-next to the models, with content that stays in your deployment. The price is that you run
-the models, and the accuracy is yours to measure. The reference models are not good enough
-on their own; see [accuracy](docs/accuracy.md).
+Hosted services such as [OpenAI's moderation endpoint](https://developers.openai.com/api/docs/guides/moderation)
+and [AWS Rekognition](https://docs.aws.amazon.com/rekognition/latest/APIReference/API_DetectModerationLabels.html)
+return scores or labels, and your content goes to the provider. Modera keeps content in
+your deployment and makes the decision a versioned, testable policy. The price is that you
+run the models and measure their accuracy yourself.
 
 ## Documentation
 
@@ -95,26 +95,11 @@ on their own; see [accuracy](docs/accuracy.md).
 | [API](docs/api.md) | Requests, results, errors, and how to act on them |
 | [Configuration](docs/configuration.md) | Every setting |
 | [Policies](docs/policies.md) | Thresholds and required checks |
-| [Models](docs/models.md) | Choosing, preparing and replacing models |
-| [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
-| [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
-| [Accuracy](docs/accuracy.md) | Measured text accuracy, calibration and review load |
-
-## How it's tested
-
-- Over 500 tests run on every change, calling the API in process: policies, limits, error
-  classification, queues, overload and shutdown, model loading with small generated
-  models, and the hardened container.
-- The Go client has unit tests with the race detector. It has no live check against the
-  API.
-- The reference upload gate is tested against a real Modera process with a stalled
-  model.
-- [Accuracy](docs/accuracy.md) was measured separately, on public labelled text. The
-  harness that produced it was removed to keep this repository small and is kept at
-  the `evaluation-archive` git tag.
-
-Not covered: photo accuracy, real-model serving speed, your platform's load balancer and termination, and
-production capacity. Nothing here measures throughput.
+| [Models](docs/models.md) | Preparing and replacing models, text rules and fallback |
+| [Photo models](docs/image-models.md) | Detectors, ONNX, and combining models |
+| [Operations](docs/operations.md) | Metrics, overload, shutdown, key rotation, troubleshooting |
+| [Design](docs/design.md) | Why it is built this way, and the trade-offs |
+| [Accuracy](docs/accuracy.md) | Measured text accuracy |
 
 ## Development
 
@@ -125,10 +110,11 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Source is in `src/modera`, tests in `tests/`. See [CONTRIBUTING](CONTRIBUTING.md) for the
-full checks and [SECURITY](SECURITY.md) to report a vulnerability.
+Over 500 tests call the API in process. The Go client has unit tests only. Not covered:
+photo accuracy, real-model speed, your load balancer, and production capacity. See
+[CONTRIBUTING](CONTRIBUTING.md) and [SECURITY](SECURITY.md).
 
 ## Licence
 
-Apache-2.0, see [LICENSE](LICENSE). Model weights are separate and have their own
-terms; check them before you deploy a model.
+Apache-2.0, see [LICENSE](LICENSE). Model weights have their own terms; check them
+before you deploy a model.

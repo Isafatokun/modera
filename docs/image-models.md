@@ -1,129 +1,111 @@
-# Photo detectors and combined models
+# Photo models
 
-A classifier scores a whole photo. A detector reports labelled regions, and Modera keeps
-the highest confidence per category. You can run either on its own, or put several
-models on one photo and write policy rules over their separate scores. Set up weights
-and the model file as described in [models](models.md#set-up-classifiers).
+A classifier scores a whole photo. A detector reports labelled regions, and Modera keeps the
+highest confidence per category. Run either alone, or put several models on one photo and
+write policy rules over their separate scores. Set up weights and the model file as
+described in [models](models.md#set-up-classifiers).
 
 ## Object detectors
 
-Choose a detector when you need labels for objects or visible regions rather than
-one classification for the whole photo. The first detector backend supports
-Transformers models compatible with `AutoModelForObjectDetection` and an image
-processor with `post_process_object_detection`. A separate [ONNX backend](#onnx-detectors)
-supports explicitly configured YOLOv8 proposal exports. Neither loads arbitrary
-ONNX layouts or PyTorch pickle files.
+Use a detector when you need labels for objects or regions, not one score for the whole
+photo. The Transformers backend supports models compatible with
+`AutoModelForObjectDetection` and an image processor with `post_process_object_detection`.
+The [ONNX backend](#onnx-detectors) supports explicitly configured YOLOv8 exports. Neither
+loads arbitrary ONNX layouts or PyTorch pickle files.
 
-In your existing models file, set the image backend to
-`transformers_object_detection`. Set `id` and `revision` to the model repository
-and its full pinned commit, and map its native labels to your policy categories
-with `label_map`. The remaining setup and model preparation steps are unchanged.
-Use the inference extra, as with classifiers. Preparation checks that the model
-loads and runs; it does not establish moderation accuracy.
+In your models file, set the image backend to `transformers_object_detection`, set `id` and
+`revision` to the repository and its full pinned commit, and map the model's native labels
+to policy categories with `label_map`. Other setup steps are unchanged, and you need the
+inference extra, as with classifiers. Preparation checks that the model loads and runs. It
+does not establish accuracy.
 
-For each mapped category, the service returns the highest detection confidence.
-If no detection has that label, its score is zero and coverage says evaluated.
-Unmapped labels do not become findings. Invalid scores, unknown output labels,
-or malformed boxes fail the request with a non-retryable internal error.
+For each mapped category the service returns the highest detection confidence. If nothing
+has that label, the score is zero and coverage says evaluated. Unmapped labels do not
+become findings. Invalid scores, unknown output labels or malformed boxes fail the request
+with a non-retryable internal error. No confidence cutoff is applied before the policy, and
+boxes are not returned. Scores are model confidence values, not probabilities.
 
-No confidence cutoff is applied before policy evaluation. Your policy thresholds
-still decide allow, review or block. Scores are model confidence values, not
-calibrated probabilities. Boxes remain internal and are not returned.
-
-To use a detector with a classifier on the same photo, see
-[combining models](#combine-image-models). Person association is not supported. A generic
-object detector is not automatically a suitable moderation model, so evaluate the actual
-model and categories before use.
+Person association is not supported. A generic object detector is not automatically a
+suitable moderation model, so evaluate the actual model and categories before use.
 
 ## ONNX detectors
 
-Use `onnx_yolo_v8` for compatible detector exports. This backend runs on CPU and
-can be installed without torch or Transformers:
+`onnx_yolo_v8` runs compatible detector exports on CPU, without torch or Transformers:
 
 ```sh
 uv sync --locked --extra onnx
 ```
 
-For a classifier and ONNX detector together, install both `--extra inference` and
+To use a classifier and an ONNX detector together, install both `--extra inference` and
 `--extra onnx`, then follow [combining models](#combine-image-models).
 
 ### Model configuration
 
-The model entry needs a pinned repository revision, a single `.onnx` filename,
-its SHA-256 digest, the complete native label order, selected `label_map`, square
-`input_size` and explicit `channel_order` (`rgb` or `bgr`). Embedded native label
-metadata, when present, must agree with the configured order.
+The entry needs a pinned repository revision, a single `.onnx` filename, its SHA-256
+digest, the complete native label order, a `label_map`, a square `input_size` and an
+explicit `channel_order` (`rgb` or `bgr`). Embedded label metadata, when present, must agree
+with the configured order.
 
 The supported contract is float32 input `[1, 3, size, size]` and one float32 output
-`[1, 4 + classes, proposals]`. The first four channels are centre-x, centre-y,
-width and height in input-image coordinates. Remaining channels are class scores
-in `[0, 1]`, without a separate objectness channel. Symbolic dimensions are allowed,
-but actual output is checked during warmup and every request. Other ONNX layouts,
-end-to-end suppressed outputs and PyTorch `.pt` files are not supported.
+`[1, 4 + classes, proposals]`. The first four channels are centre-x, centre-y, width and
+height in input-image coordinates. The rest are class scores in `[0, 1]`, with no separate
+objectness channel. Symbolic dimensions are allowed, but the actual output is checked during
+warmup and on every request. Other ONNX layouts, end-to-end suppressed outputs and PyTorch
+`.pt` files are not supported.
 
-Preparation downloads only the named artifact and checks its hash, graph and
-warmup. Serving loads the verified cached artifact offline. External tensor files
-are rejected. Only use trusted models: a digest identifies bytes; it does not
-establish their quality or provenance.
+Preparation downloads only the named artifact and checks its hash, graph and warmup.
+Serving loads the verified cached artifact offline, and external tensor files are rejected.
+A digest identifies bytes. It does not establish quality or provenance, so use only trusted
+models.
 
 ### What the scores mean
 
-Preprocessing applies EXIF orientation, converts to RGB, pads the bottom/right
-with black to make a square, then uses OpenCV linear resizing and scales by
-`1 / 255`. The configured channel order is applied explicitly.
+Preprocessing applies EXIF orientation, converts to RGB, pads the bottom and right with
+black to a square, resizes linearly with OpenCV, scales by `1 / 255`, and applies the
+configured channel order. Each proposal's highest-scoring label wins. Each mapped category
+gets the highest confidence among proposals with that label, or zero when none wins. There
+is no confidence cutoff before the policy. Class-wise non-maximum suppression would keep
+these maxima, so it is not run. A package that suppresses across classes or applies its own
+confidence floor will score differently.
 
-For each proposal, its highest-scoring label wins. Each mapped category receives
-the highest confidence among proposals with that label, or zero when none wins.
-There is no confidence cutoff before the policy. Boxes are not returned.
-Class-wise non-maximum suppression would preserve these category maxima, so it is
-not run. A package that suppresses across classes or applies its own confidence floor
-will score differently.
-
-Artifacts are limited to 256 MiB; images to 4096 pixels per side for this backend.
-The existing byte/pixel limits still apply. Output is limited to 40,000 proposals
-and 256 labels. These limits bound processing and say nothing about capacity.
+Limits: artifacts up to 256 MiB, images up to 4096 pixels per side, 40,000 proposals and 256
+labels per output. The general byte and pixel limits still apply. These bound processing and
+say nothing about capacity.
 
 ### Research candidate
 
-The pinned [candidate configuration](../examples/nudenet-onnx.json)
-loads and warms successfully. It is not a recommended moderation profile. Its
-model-card terms and embedded artifact terms disagree; that remains unresolved.
-The [example policy](../examples/onnx-policy.json) illustrates configuration only.
-Do not treat its threshold as calibrated.
+The pinned [candidate configuration](../examples/nudenet-onnx.json) loads and warms, but it
+is not a recommended moderation profile: its model-card terms and embedded artifact terms
+disagree, and that is unresolved. The [example policy](../examples/onnx-policy.json) only
+illustrates configuration, and its threshold is not calibrated.
 
 ```sh
 uv run --locked --extra onnx python -m modera.prepare_models \
   --config examples/nudenet-onnx.json
 ```
 
-Set `MODERA_MODEL_FILE` to your model file and `MODERA_POLICY_FILE` to your policy;
-use the usual bearer key and serving command. See [Start here](start-here.md).
-For a container, add `--build-arg ONNX=true`; add `INFERENCE=true` too when needed.
+Set `MODERA_MODEL_FILE` and `MODERA_POLICY_FILE` as for any model. For a container, add
+`--build-arg ONNX=true`, and `INFERENCE=true` too when needed.
 
 ## Combine image models
 
-Use a detector and a classifier together when they provide complementary evidence.
-Configure up to four image models in `image_models` instead of the single `image`
-field.
-
-Start from [example model configuration](../examples/ensemble-models.json) and
-[example policy](../examples/ensemble-policies.json). Replace the example model IDs,
-pinned revisions and native labels with your chosen models before preparation.
-These files demonstrate configuration; they are not a tested moderation profile.
-Use the same [prepare and run steps](models.md#set-up-classifiers).
+Use a detector and a classifier together when they give complementary evidence. Configure up
+to four image models in `image_models` instead of the single `image` field. Start from the
+[example models](../examples/ensemble-models.json) and
+[example policy](../examples/ensemble-policies.json), replace the example IDs, pinned
+revisions and labels, then use the same [prepare and run steps](models.md#set-up-classifiers).
+These files show configuration; they are not a tested moderation profile.
 
 Give each model a different repository ID and separate category names, such as
-`detect.exposed` and `classify.sexual`. Scores are kept separate. A high detector
-score is not averaged away by a low classifier score. Findings include `model`
-to identify their producer; `models` contains the revisions actually used.
+`detect.exposed` and `classify.sexual`. Scores stay separate, so a high detector score is
+not averaged away by a low classifier score. Findings include `model` to name their producer,
+and `models` lists the revisions actually used.
 
-### Choose how evidence becomes an action
+### Combining evidence
 
-Ordinary policy rules still work: any block threshold wins over review thresholds.
-All checks required by the policy must finish before a decision is returned.
-
-For combinations, add `image_composites` to a policy. Each rule has a unique `id`,
-an `action` of `review` or `block`, and exactly one of:
+Ordinary rules still work, and any block threshold beats review thresholds. For
+combinations, add `image_composites` to a policy. Each rule has a unique `id`, an `action` of
+`review` or `block`, and exactly one of:
 
 | Field | When the rule fires |
 | --- | --- |
@@ -143,30 +125,28 @@ For example, review only when both signals reach their own thresholds:
 }
 ```
 
-Minimums are inclusive, and these are example values, not recommended thresholds.
-A combination produces no new score. The response keeps the original scores; `decision.reasons` lists contributing categories and
-`decision.matched_rules` identifies composite rules contributing to the chosen
-action. Block takes precedence over review.
+Minimums are inclusive, and these values are examples. A combination produces no new score.
+The response keeps the original scores, `decision.reasons` lists the contributing
+categories, and `decision.matched_rules` names the composite rules behind the action. Block
+beats review.
 
-Combinations apply to the whole image. They do not establish that two detections
-belong to the same person, or that the content has a particular intent. The only
-supported `scope` is `image`; `same_subject` is rejected.
+Combinations apply to the whole image. They do not show that two detections are the same
+person or that the content has any particular intent. The only supported `scope` is `image`,
+and `same_subject` is rejected.
 
-### Failures and resource limits
+### Failures and limits
 
-Models needed by the selected policy run in configuration order, with one shared
-inference deadline. Models not needed by that policy are not run. All listed
-conditions require evidence, including `any_of`: an unavailable check cannot be
-silently skipped just because another condition matched. A failure returns an
-error without a decision, even if an earlier model found a blocking signal.
+Models the policy needs run sequentially, in configuration order, under one shared inference
+deadline. Others do not run. Every listed condition needs evidence, including each one in
+an `any_of`, so an unavailable check cannot be skipped just because another matched. A
+failure returns an error with no decision, even if an earlier model found a blocking signal.
 
-Each model has its own bounded worker and queue. Native work retains its slot after
-timeout or cancellation. Models run sequentially within one request; different
-requests can occupy different model workers at the same time. Multi-model requests
-validate the photo first, then each selected model decodes and prepares the bytes
-on its own worker. Budget for additional CPU, latency and memory. All configured
-models load at startup, even when a particular request uses only one.
+Each model has its own bounded worker and queue, and native work keeps its slot after a
+timeout or cancellation. Different requests can use different model workers at the same
+time. A multi-model request validates the photo once, then each model decodes and prepares
+the bytes on its own worker, so budget extra CPU, latency and memory. All configured models
+load at startup, even when a request uses only one.
 
-There is no image-model fallback or partial-success mode. Measure the combined
-policy on independent labelled examples before relying on it. Supporting two model
-architectures does not establish better moderation accuracy or production capacity.
+There is no image-model fallback or partial-success mode. Measure a combined policy on
+independent labelled examples before relying on it. Supporting two architectures does not
+show better accuracy or production capacity.

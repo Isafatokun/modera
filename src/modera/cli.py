@@ -51,7 +51,7 @@ def initialize(directory: Path) -> None:
         )
     (directory / ".gitignore").write_text(".env\n")
     print("Created a text rules demo. No model is installed; photos are unsupported.")
-    print("The key is in .env. Keep it private. See docs/start-here.md for commands.")
+    print("The key is in .env. Keep it private. Next steps: docs/configuration.md.")
 
 
 class SetupProblem(Exception):

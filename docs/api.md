@@ -103,7 +103,7 @@ Each finding includes `source: "model"` or `"rules"`. Rule results include
 `rules_version`; `models` lists only models that completed evaluation and can be empty
 for rules-only results. `fallback: true` identifies degraded evaluation; `policy`
 records the policy actually used. The preprocessing version fingerprints model
-settings, label mappings, and rule configuration. See [fallback semantics](models.md).
+settings, label mappings, and rule configuration. See [fallback](models.md#fallback).
 
 ## Using the result
 
