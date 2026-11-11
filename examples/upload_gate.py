@@ -14,6 +14,7 @@ SQLite and has no photo storage, authentication or worker supervision.
 """
 
 import json
+import math
 import random
 import sqlite3
 import time
@@ -24,7 +25,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 State = Literal["pending", "published", "held", "rejected"]
 
@@ -68,6 +69,8 @@ def target_state(verdict: Verdict) -> State:
 
 
 class UploadGate:
+    """Holds uploads private until a completed decision, and retries safely."""
+
     def __init__(self, database: Path | str, moderate: Moderator) -> None:
         self._database = str(database)
         self._moderate = moderate
@@ -76,8 +79,7 @@ class UploadGate:
                 "CREATE TABLE IF NOT EXISTS uploads ("
                 "upload_id TEXT PRIMARY KEY, "
                 "state TEXT NOT NULL DEFAULT 'pending', "
-                "photo BLOB NOT NULL, "
-                "attempts INTEGER NOT NULL DEFAULT 0)"
+                "photo BLOB NOT NULL)"
             )
             db.execute(
                 "CREATE TABLE IF NOT EXISTS review_cases ("
@@ -98,6 +100,24 @@ class UploadGate:
         finally:
             db.close()
 
+    @contextmanager
+    def _read(self) -> Iterator[sqlite3.Connection]:
+        """A plain connection for reads, which need no write lock."""
+        db = sqlite3.connect(self._database, timeout=10)
+        try:
+            yield db
+        finally:
+            db.close()
+
+    @staticmethod
+    def _state_of(db: sqlite3.Connection, upload_id: str) -> State:
+        row = db.execute(
+            "SELECT state FROM uploads WHERE upload_id = ?", (upload_id,)
+        ).fetchone()
+        if row is None:
+            raise KeyError(upload_id)
+        return cast(State, row[0])
+
     def submit(self, upload_id: str, photo: bytes) -> State:
         """Record an upload as pending. Repeating an ID changes nothing."""
         with self._transaction() as db:
@@ -108,20 +128,16 @@ class UploadGate:
         return self.state(upload_id)
 
     def state(self, upload_id: str) -> State:
-        with self._transaction() as db:
-            row = db.execute(
-                "SELECT state FROM uploads WHERE upload_id = ?", (upload_id,)
-            ).fetchone()
-        if row is None:
-            raise KeyError(upload_id)
-        return row[0]  # type: ignore[no-any-return]
+        """The upload's state. Raises ``KeyError`` for an unknown ID."""
+        with self._read() as db:
+            return self._state_of(db, upload_id)
 
     def is_visible(self, upload_id: str) -> bool:
         """Only a published upload may be shown to other people."""
         return self.state(upload_id) == "published"
 
     def review_cases(self) -> list[str]:
-        with self._transaction() as db:
+        with self._read() as db:
             rows = db.execute("SELECT upload_id FROM review_cases").fetchall()
         return [row[0] for row in rows]
 
@@ -134,11 +150,7 @@ class UploadGate:
             if row is None:
                 raise KeyError(upload_id)
             if row[0] != "pending":
-                return row[0]  # type: ignore[no-any-return]
-            db.execute(
-                "UPDATE uploads SET attempts = attempts + 1 WHERE upload_id = ?",
-                (upload_id,),
-            )
+                return cast(State, row[0])
             photo = row[1]
         # The call runs outside the transaction so a slow model never holds the
         # database lock. Two concurrent attempts can both reach this point; the
@@ -156,10 +168,7 @@ class UploadGate:
                     "INSERT OR IGNORE INTO review_cases (upload_id) VALUES (?)",
                     (upload_id,),
                 )
-            row = db.execute(
-                "SELECT state FROM uploads WHERE upload_id = ?", (upload_id,)
-            ).fetchone()
-        return row[0]  # type: ignore[no-any-return]
+            return self._state_of(db, upload_id)
 
     def decide(
         self,
@@ -167,6 +176,7 @@ class UploadGate:
         *,
         deadline_seconds: float = 30.0,
         base_delay: float = 0.5,
+        max_delay: float = 30.0,
         max_attempts: int = 8,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
@@ -177,18 +187,36 @@ class UploadGate:
         Waits at least ``Retry-After`` and adds jitter on top, so callers rejected
         together do not return together. When the deadline or attempt limit is
         reached the upload stays pending, which is the correct answer for "unknown".
+
+        The deadline is checked between attempts, so one request already in flight
+        can run on to the moderator's own timeout. The random part of each wait is
+        capped at ``max_delay``. A permanent error is raised to the caller.
         """
         deadline = clock() + deadline_seconds
         for attempt in range(max_attempts):
             try:
                 return self.attempt(upload_id)
             except RetryableError as error:
-                spread = base_delay * 2**attempt
+                spread = min(base_delay * 2 ** min(attempt, 30), max_delay)
                 wait = error.retry_after + jitter() * spread
                 if attempt == max_attempts - 1 or clock() + wait >= deadline:
                     break
                 sleep(wait)
         return self.state(upload_id)
+
+
+def parse_retry_after(value: str | None) -> float:
+    """Seconds to wait from a ``Retry-After`` header, defaulting to one second.
+
+    Only the delay-seconds form is understood. A missing, negative, non-finite or
+    unparsable value, including an HTTP date, falls back to one second, so a
+    misbehaving proxy cannot make the caller sleep for a nonsensical time.
+    """
+    try:
+        seconds = float(value) if value is not None else 1.0
+    except ValueError:
+        return 1.0
+    return seconds if math.isfinite(seconds) and seconds >= 0 else 1.0
 
 
 def http_moderator(base_url: str, api_key: str, *, timeout: float = 15.0) -> Moderator:
@@ -222,10 +250,7 @@ def http_moderator(base_url: str, api_key: str, *, timeout: float = 15.0) -> Mod
             with suppress(ValueError, KeyError, TypeError):
                 retryable = bool(json.load(error)["error"]["retryable"])
             if retryable:
-                try:
-                    delay = float(error.headers.get("Retry-After", "1"))
-                except ValueError:
-                    delay = 1.0
+                delay = parse_retry_after(error.headers.get("Retry-After"))
                 raise RetryableError(delay) from error
             raise PermanentError(f"HTTP {error.code}") from error
         except (urllib.error.URLError, TimeoutError, ConnectionError) as error:

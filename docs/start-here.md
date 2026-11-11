@@ -5,7 +5,7 @@ Pick a path. Both bind to localhost.
 | Goal | Start with | Needs |
 | --- | --- | --- |
 | Try requests and decisions | [Quick start](../README.md#quick-start) | Python 3.12 and uv, no model download |
-| Run real text and photo models | [Real models](#real-models) | Python 3.12, uv and about 0.6 GiB of weights on first run |
+| Run real text and photo models | [Real models](#real-models) | Python 3.12, uv and a model download on first run (size depends on the models) |
 | Connect your backend | [Go client](../clients/go/README.md) or [API](api.md) | A running service and its key |
 
 The rules demo matches example phrases and shows nothing about model quality or photo

@@ -8,6 +8,7 @@ from examples.upload_gate import (
     RetryableError,
     UploadGate,
     Verdict,
+    parse_retry_after,
     target_state,
 )
 
@@ -169,3 +170,48 @@ def test_late_answer_cannot_overwrite_a_decision(tmp_path: Path) -> None:
     slow.submit("u1", b"photo")
     assert slow.attempt("u1") == "rejected"
     assert not slow.is_visible("u1")
+
+
+@pytest.mark.parametrize(
+    ("header", "seconds"),
+    [
+        (None, 1.0),
+        ("2", 2.0),
+        ("0", 0.0),
+        ("1.5", 1.5),
+        ("-5", 1.0),
+        ("nan", 1.0),
+        ("inf", 1.0),
+        ("Wed, 21 Oct 2026 07:28:00 GMT", 1.0),
+        ("soon", 1.0),
+    ],
+)
+def test_retry_after_never_yields_an_unusable_delay(
+    header: str | None, seconds: float
+) -> None:
+    assert parse_retry_after(header) == seconds
+
+
+def test_backoff_stays_bounded_for_a_very_large_attempt_limit(tmp_path: Path) -> None:
+    g, _ = gate(tmp_path, RetryableError(0))
+    g.submit("u1", b"photo")
+    waits: list[float] = []
+    state = g.decide(
+        "u1",
+        max_attempts=1500,
+        deadline_seconds=1e12,
+        max_delay=30,
+        sleep=waits.append,
+        jitter=lambda: 1.0,
+    )
+    assert state == "pending"
+    assert len(waits) == 1499
+    assert max(waits) <= 30
+
+
+def test_unknown_upload_is_a_key_error(tmp_path: Path) -> None:
+    g, _ = gate(tmp_path, Verdict("allow"))
+    with pytest.raises(KeyError):
+        g.state("missing")
+    with pytest.raises(KeyError):
+        g.attempt("missing")
