@@ -267,14 +267,18 @@ this is an experiment and not a shipped feature.
 
 ## Verification
 
-[`docs/verification.md`](verification.md) maps each claim to the check that supports it.
-In short: over 500 tests run on every change, covering model loading with small
-generated models, the hardened container and the Go client. Two heavier checks run against the real
-stack. One starts the Compose setup from an empty cache with the real checkpoints. The
-other drives the Go client through NGINX to two real-model processes and exercises
-overload, retry, drain, restart and forced termination.
+Over 500 tests run on every change. They call the API in process and cover policies,
+limits, error classification, queues, overload and shutdown, model loading with small
+generated models, and the hardened container. The Go client has unit tests with the race
+detector, a live check against the real API (`clients/go/integration.py`), and a CI step
+that installs it into a fresh module. A Compose smoke test (`e2e/reference/verify.py`)
+starts the reference setup from an empty cache with the real checkpoints.
 
-Verification also found real defects, which is the best argument for it:
+A heavier rehearsal also existed, driving the Go client through NGINX to two real-model
+processes to exercise drain, restart and forced termination. It was removed from the tree
+as out of scope for what this project claims, and remains in history at `4cb538c`.
+
+Verification found real defects, which is the best argument for it:
 
 - A race in the worker that freed a slot after the caller resumed, causing spurious
   `503`s. It was first seen on Python 3.14, and whether 3.12 was affected was never
@@ -282,11 +286,9 @@ Verification also found real defects, which is the best argument for it:
 - Text fallback firing on a merely busy worker.
 - A URL being downloaded before cheap checks that would have rejected it.
 - The model-not-loaded misclassification above.
-- A flaky crash in the rehearsal when a worker's process ID was reused.
 
 Large functions were split behind tests. Where coverage was thin (the doctor command,
-the Go result validator, `Retry-After` parsing) tests were written first, and the
-verification scripts were compared old against new before they replaced the originals.
+the Go result validator, `Retry-After` parsing) tests were written first.
 
 ## What this does not establish
 
@@ -294,12 +296,13 @@ verification scripts were compared old against new before they replaced the orig
   datasets (above), and the target is not met. Photo accuracy has not been measured at
   all. The [photo harness](../evaluation/README.md) exists for that, and either harness
   should be run on your own labelled sample before a policy acts on real content.
-- **Behaviour on your platform.** The rehearsal proves process and gateway behaviour on
-  a Linux runner, not your load balancer, TLS or termination controller.
-- **Production capacity.** The [load test](../loadtests/README.md) is a starting point on
-  one machine, and CI does not run it.
-- **A first integration.** No application yet calls Modera, keeps a photo pending on
-  failure and survives a burst. That was the next milestone and is not done.
+- **Behaviour on your platform.** The container and Compose checks cover one container
+  on one runner, and graceful shutdown is tested at process level. Your load balancer,
+  TLS and termination controller are not.
+- **Production capacity.** Nothing here measures throughput or latency under load.
+- **A real integration.** The example application in `clients/go/cmd/moderate` shows a
+  caller treating a failed check as `pending` and never as `allow`, but no product uses
+  Modera yet.
 
 ## Trade-offs at a glance
 

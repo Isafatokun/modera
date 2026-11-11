@@ -83,8 +83,21 @@ application owns those, including retrying safely: a retry is a new evaluation.
 | [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
 | [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
 | [Accuracy](docs/accuracy.md) | Measured text accuracy, calibration and review load |
-| [Verification](docs/verification.md) | What is tested, how to run it, and what is not shown |
 | [Evaluation](evaluation/README.md) | Reproducing the text numbers, and checking a policy on your own photos |
+
+## How it's tested
+
+- Over 500 tests run on every change, calling the API in process: policies, limits, error
+  classification, queues, overload and shutdown, model loading with small generated
+  models, and the hardened container.
+- The Go client has unit tests with the race detector and a live check against the real
+  API, and CI installs it into a fresh module.
+- A Compose smoke test starts the reference setup from an empty cache with the real
+  checkpoints.
+- [Accuracy](docs/accuracy.md) is measured separately, on public labelled text.
+
+Not covered: photo accuracy, your platform's load balancer and termination, and
+production capacity. Nothing here measures throughput.
 
 ## Development
 
@@ -96,8 +109,7 @@ uv run --locked pytest
 ```
 
 Source is in `src/modera`, tests in `tests/`. See [CONTRIBUTING](CONTRIBUTING.md) for the
-full checks and [SECURITY](SECURITY.md) to report a vulnerability. [Load tests](loadtests/README.md)
-measure capacity with real models, and [releasing](docs/releasing.md) is for maintainers.
+full checks and [SECURITY](SECURITY.md) to report a vulnerability.
 
 ## Licence
 
