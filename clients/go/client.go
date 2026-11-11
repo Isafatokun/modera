@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand/v2"
 	"mime/multipart"
 	"net"
@@ -353,7 +354,7 @@ func (c *Client) interpretError(ctx context.Context, o attemptOutcome, attempt i
 	if !retryable || attempt == c.options.MaxAttempts {
 		return fail(apiErr)
 	}
-	delay := max(c.backoff(attempt), apiErr.RetryAfter)
+	delay := c.retryDelay(attempt, apiErr.RetryAfter)
 	if deadline, ok := ctx.Deadline(); ok && delay >= time.Until(deadline) {
 		return fail(apiErr)
 	}
@@ -361,6 +362,17 @@ func (c *Client) interpretError(ctx context.Context, o attemptOutcome, attempt i
 }
 
 func (c *Client) pause(ctx context.Context, delay time.Duration) error { return c.wait(ctx, delay) }
+
+// retryDelay waits at least the server's Retry-After and adds jitter on top. Every
+// caller rejected at the same moment is told the same Retry-After, so without the
+// jitter they would all return at the same instant and overload the service again.
+func (c *Client) retryDelay(attempt int, retryAfter time.Duration) time.Duration {
+	jitter := c.backoff(attempt)
+	if retryAfter > time.Duration(math.MaxInt64)-jitter {
+		return retryAfter
+	}
+	return retryAfter + jitter
+}
 
 func (c *Client) backoff(attempt int) time.Duration {
 	limit := c.options.BaseDelay

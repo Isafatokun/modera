@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -410,5 +411,30 @@ func TestTransportRetryClassification(t *testing.T) {
 				t.Fatalf("calls=%d result=%v error=%v", calls, result, err)
 			}
 		})
+	}
+}
+
+func TestRetryDelayWaitsAtLeastRetryAfterAndAddsJitter(t *testing.T) {
+	c := mustClient(t, "http://127.0.0.1:1", Options{})
+	retryAfter := time.Second
+	c.random = func(n int64) int64 { return 0 }
+	if got := c.retryDelay(1, retryAfter); got != retryAfter {
+		t.Fatalf("no jitter drawn: delay = %v, want exactly Retry-After", got)
+	}
+	c.random = func(n int64) int64 { return n - 1 }
+	high := c.retryDelay(1, retryAfter)
+	c.random = func(n int64) int64 { return n / 2 }
+	middle := c.retryDelay(1, retryAfter)
+	if middle <= retryAfter || high <= middle {
+		t.Fatalf("jitter must spread callers above Retry-After: middle %v high %v", middle, high)
+	}
+}
+
+func TestRetryDelayDoesNotOverflowOnHugeRetryAfter(t *testing.T) {
+	c := mustClient(t, "http://127.0.0.1:1", Options{})
+	c.random = func(n int64) int64 { return n - 1 }
+	huge := time.Duration(math.MaxInt64)
+	if got := c.retryDelay(3, huge); got != huge {
+		t.Fatalf("delay = %v, want %v", got, huge)
 	}
 }

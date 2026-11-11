@@ -47,7 +47,7 @@ the [reference setup](../deploy/reference/README.md#url-checks).
 
 Modera returns evidence and your application takes the action. If a result surprises
 you, read `findings`, `coverage`, `policy`, `models` and `fallback` together; a low score
-only shows how the configured policy ran. See [how it works](how-it-works.md).
+only shows how the configured policy ran. See [using the result](api.md#using-the-result).
 
 ## When it doesn't work
 

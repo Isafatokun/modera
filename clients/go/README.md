@@ -73,9 +73,10 @@ An empty policy selects `default`.
 The client retries transport timeouts, interrupted or refused connections, and API
 errors marked retryable on 408, 429 or 503. It does not retry validation or
 authentication errors, malformed responses, bad certificates, an unsupported backend
-or redirects. A `Retry-After` value, in seconds or as an HTTP date, is a minimum delay.
-If it cannot fit in the remaining budget, the client returns the last `APIError` at
-once.
+or redirects. A `Retry-After` value, in seconds or as an HTTP date, is a minimum delay: the client
+waits at least that long and adds jitter on top, so callers rejected together do not
+return together. If the delay cannot fit in the remaining budget, the client returns
+the last `APIError` at once.
 
 Each attempt is a new evaluation with a new request ID, and the bytes behind an image
 URL or the server's configuration can change between attempts. Make your own follow-up
