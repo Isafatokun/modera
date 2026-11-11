@@ -1,4 +1,30 @@
-# Photo evaluation
+# Evaluation
+
+Two tools: one measures text accuracy on public datasets, and one checks a policy
+on your own labelled photos.
+
+## Text accuracy
+
+`evaluation/text.py` scores pinned, human-labelled public datasets with pinned models
+through Modera's real serving path, and writes [the accuracy page](../docs/accuracy.md).
+Cutoffs are chosen on a validation half and every reported figure is from the held-out
+half. The 90% recall / 5% false-flag target is fixed in the code before scoring.
+
+```sh
+uv sync --locked --extra inference
+uv run --locked --extra inference python -m evaluation.text score \
+  --cache model-cache --scores evaluation/reports/text-scores.json
+uv run --locked --extra inference python -m evaluation.text report \
+  --scores evaluation/reports/text-scores.json \
+  --json evaluation/reports/text.json --markdown docs/accuracy.md
+```
+
+`score` downloads the models and datasets (several GB, see the model list in the page),
+runs them, and saves raw scores with no text in them. It resumes if interrupted.
+`report` recomputes every table from those scores in seconds, so the statistics can be
+checked or extended without rerunning the models.
+
+## Photo evaluation
 
 Check a policy on your own labelled photos before it acts on real content. The
 harness submits each photo to a running Modera API and reports where the decision

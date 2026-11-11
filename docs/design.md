@@ -18,7 +18,9 @@ It does this by splitting three things that are usually tangled together:
   stores anything.
 
 The service is small, about 3,300 lines of Python, with a Go client alongside. The
-parts worth reading closely are the failure semantics, not the happy path.
+parts worth reading closely are the failure semantics and the accuracy measurements.
+The measurements are not flattering: the reference text models do not reach the
+accuracy target, and this memo says so.
 
 ## Requirements
 
@@ -196,6 +198,73 @@ must make its own follow-up actions (publishing, opening a review case) idempote
 That is deliberate: a payment gateway needs idempotency because retries can charge twice,
 and this service has no equivalent hazard.
 
+## What the text measurements show
+
+Everything here comes from [`docs/accuracy.md`](accuracy.md), produced by
+`python -m evaluation.text` and reproducible from the saved raw scores. Six pinned
+models were scored on two public human-labelled datasets, ToxiFrench (French) and the
+human-rated ToxiGen subset (English), through the real serving path. Cutoffs came from a
+validation half. Every figure is from the held-out half. The target was fixed up front:
+at most 5% of clean text flagged and at least 90% of toxic text caught.
+
+**No model meets it, on either dataset.** At the cutoff that holds false flags near 5%,
+the best model catches 32% of toxic French text and 48% of toxic English text. The
+reference model, Horizon Small, catches 40% of French and 27% of English at the default
+0.5 cutoff, while flagging 9% and 7.5% of clean text.
+
+**Why it fails.** Three observations, in order of how well the data supports them.
+
+1. *It is a ranking problem, not a threshold problem.* The best ROC AUC is 0.83 on
+   French and 0.86 on English. Reaching 90% recall at 5% false flags needs a far
+   stronger ranking than any model here has, so no cutoff can fix it. Moving the cutoff
+   only trades one error for the other.
+2. *On English, the task is mismatched.* ToxiGen is generated, mostly implicit hate
+   speech. The model trained for hate speech ranks it far better (AUC 0.86) than the
+   toxicity models (0.67 to 0.78). On French that model only ties the best toxicity
+   model, so the mismatch explains English and not French.
+3. *The default cutoff is wrong for these data.* Moving from 0.5 to a validation-chosen
+   cutoff changes recall a lot: for the hate-speech model on French, from 21% to 32%.
+   Cutoffs have to be set per product from labelled data. They do not transfer.
+
+Label quality limits all of this and was **not measured**: ToxiFrench labels come from a
+semi-automated pipeline with human checks, and ToxiGen's come from a 1 to 5 rating cut at
+3. Examples near that boundary can disagree with any model. I cannot say how much of the
+gap is label noise.
+
+**Do the scores mean what they say? No.** Calibration error is 0.17 to 0.33. Text that
+the best English model scores 0.1 to 0.2 is actually toxic 46% of the time, and text
+scored under 0.1 is toxic 15% of the time. Most raw Brier scores are no better than always
+predicting the base rate. A calibration fitted on validation brings the error down to 0.03
+to 0.09 but cannot improve ranking. The practical rule: treat the raw score as a rank and
+pick cutoffs from data, and never read 0.7 as 70%.
+
+**What it costs a reviewer.** The test sets are about half toxic, and real traffic is not.
+Holding the same recall and false-flag rate at 1% toxic content, the best models flag
+about 40 to 60 items per 1,000, and only 7% to 8% of those are toxic. More than nine in ten
+flags would be false alarms, and between half (English) and about 70% (French) of the
+toxic text would still be missed. At 5%
+toxic, about 30% of flags are right. This is the gap between a benchmark and production
+that the measurements exist to expose.
+
+**Does a second model help? Not clearly.** Flagging when either of the two best models
+crosses its own cutoff gave no gain on French, where the two best are near-duplicates of
+each other. On English it raised recall from 48% to 54% and false flags from 5.6% to 8.3%.
+That looks like moving along the same trade-off and not improving it, though the intervals
+overlap, so I would not claim either way. The service serves one text model today, so
+this is an experiment and not a shipped feature.
+
+**What I would do next.**
+
+- Treat the 90% / 5% target as unmet and stop describing the reference text policy as
+  adequate. Its review cutoff of 0.5 is uncalibrated and, on both datasets, catches little
+  while flagging more clean text than the 5% budget.
+- Run the harness on each product's own labelled sample, since that is the only number
+  that predicts that product. Choose cutoffs there and budget human review against the
+  prevalence-adjusted false-alarm rate.
+- Measure photos. Nothing in this section applies to them.
+- Try stronger models and a different second opinion against the same pre-registered
+  protocol, and report the result whichever way it goes.
+
 ## Verification
 
 [`docs/verification.md`](verification.md) maps each claim to the check that supports it.
@@ -221,10 +290,10 @@ verification scripts were compared old against new before they replaced the orig
 
 ## What this does not establish
 
-- **Moderation accuracy.** The reference models and thresholds are examples. No
-  independently labelled evidence ships with the repository. The
-  [evaluation harness](../evaluation/README.md) exists to produce that evidence on your
-  own photos, and it should be run before a policy acts on real content.
+- **Moderation accuracy for your content.** Text accuracy is measured on two public
+  datasets (above), and the target is not met. Photo accuracy has not been measured at
+  all. The [photo harness](../evaluation/README.md) exists for that, and either harness
+  should be run on your own labelled sample before a policy acts on real content.
 - **Behaviour on your platform.** The rehearsal proves process and gateway behaviour on
   a Linux runner, not your load balancer, TLS or termination controller.
 - **Production capacity.** The [load test](../loadtests/README.md) is a starting point on
@@ -250,6 +319,8 @@ verification scripts were compared old against new before they replaced the orig
 1. Build the first integration: store `pending` before calling, record the verdict with
    its provenance, and retry stuck items. The fault-injecting backend exists for this and
    has not been merged.
-2. Run the evaluation harness on a representative photo set and decide which policy to
-   pilot.
-3. Decide whether to keep the ONNX research candidate, whose model licence is unresolved.
+2. Measure photo accuracy with the same protocol as text, on a labelled set you choose,
+   and decide which policy to pilot.
+3. Revisit the reference text policy in light of the measurements above: pick a better
+   model or operating point, or say plainly that it is a demo.
+4. Decide whether to keep the ONNX research candidate, whose model licence is unresolved.

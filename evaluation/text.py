@@ -14,6 +14,8 @@ import random
 import secrets
 import tempfile
 import unicodedata
+from bisect import bisect_left
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +34,8 @@ REFERENCE_CUTOFF = 0.5
 SALT = "modera-text-v1"
 MAX_CHARACTERS = 4096
 BOOTSTRAPS = 1000
+BINS = 10
+PREVALENCES = (0.01, 0.05, 0.20)
 
 SOURCES: dict[str, dict[str, str]] = {
     "ToxiFrench (French)": {
@@ -60,12 +64,50 @@ MODELS: dict[str, dict[str, Any]] = {
         "activation": "sigmoid",
         "label_map": {"toxicity": "toxicity"},
     },
+    "Horizon Base": {
+        "id": "Horizon-Labs/multilingual-toxicity-base",
+        "revision": "3ed527edbce089f6a9a6bff34151c88e281c97e6",
+        "activation": "sigmoid",
+        "label_map": {"toxicity": "toxicity"},
+    },
     "Gravitee DistilBERT": {
         "id": "gravitee-io/distilbert-multilingual-toxicity-classifier",
         "revision": "865ad1b453a49e4a7f2471fc40b727ececd28314",
         "activation": "softmax",
         "label_map": {"toxic": "toxicity"},
     },
+    "TextDetox BERT": {
+        "id": "textdetox/bert-multilingual-toxicity-classifier",
+        "revision": "8fe5526e9c6b69cf1a615104a2ad037fb266c670",
+        "activation": "softmax",
+        "label_map": {"LABEL_1": "toxicity"},
+    },
+    "TextDetox XLM-R Large v2": {
+        "id": "textdetox/xlmr-large-toxicity-classifier-v2",
+        "revision": "38ab1b77bd3ff7779777cfa5cda203d9912b14b9",
+        "activation": "softmax",
+        "label_map": {"toxic": "toxicity"},
+    },
+    "Horizon hate speech": {
+        "id": "Horizon-Labs/multilingual-hate-speech-base",
+        "revision": "9ee208ff8052f676bdd53fba82d90d8e4a0f9ead",
+        "activation": "sigmoid",
+        "label_map": {"hate": "toxicity"},
+    },
+}
+MODEL_NOTES: dict[str, dict[str, str]] = {
+    "Horizon Small": {"licence": "Apache-2.0", "task": "toxicity"},
+    "Horizon Base": {"licence": "Apache-2.0", "task": "toxicity"},
+    "Gravitee DistilBERT": {"licence": "OpenRAIL++", "task": "toxicity"},
+    "TextDetox BERT": {"licence": "OpenRAIL++", "task": "toxicity"},
+    "TextDetox XLM-R Large v2": {"licence": "OpenRAIL++", "task": "toxicity"},
+    "Horizon hate speech": {"licence": "Apache-2.0", "task": "hate speech"},
+}
+EXCLUDED = {
+    "malexandersalazar/xlm-roberta-large-binary-cls-toxicity": (
+        "its model card lists toxigen/toxigen-data as training data, so the English "
+        "result would not be a held-out test"
+    ),
 }
 
 
@@ -292,6 +334,102 @@ def bands(
     }
 
 
+def brier(scores: list[float], labels: list[int]) -> float:
+    return sum((s - y) ** 2 for s, y in zip(scores, labels, strict=True)) / len(scores)
+
+
+def reliability(scores: list[float], labels: list[int]) -> list[dict[str, Any]]:
+    """Equal-width score bins: how often the examples in each bin are really toxic."""
+    table = []
+    for index in range(BINS):
+        low, high = index / BINS, (index + 1) / BINS
+        members = [
+            (s, y)
+            for s, y in zip(scores, labels, strict=True)
+            if low <= s < high or (index == BINS - 1 and s == 1.0)
+        ]
+        if members:
+            table.append(
+                {
+                    "range": [low, high],
+                    "n": len(members),
+                    "mean_score": round(sum(s for s, _ in members) / len(members), 4),
+                    "observed": round(sum(y for _, y in members) / len(members), 4),
+                }
+            )
+    return table
+
+
+def ece(scores: list[float], labels: list[int]) -> float:
+    """Expected calibration error: the average gap between score and observed rate."""
+    total: float = 0.0
+    for item in reliability(scores, labels):
+        total += item["n"] / len(scores) * abs(item["observed"] - item["mean_score"])
+    return total
+
+
+def isotonic(scores: list[float], labels: list[int]) -> Callable[[float], float]:
+    """Monotone calibration map fitted by pooling adjacent violators."""
+    blocks: list[list[float]] = []  # [sum of labels, count, highest score]
+    for score, label in sorted(zip(scores, labels, strict=True)):
+        if blocks and blocks[-1][2] == score:
+            blocks[-1][0] += label
+            blocks[-1][1] += 1
+        else:
+            blocks.append([float(label), 1.0, score])
+        while len(blocks) > 1 and (
+            blocks[-2][0] / blocks[-2][1] > blocks[-1][0] / blocks[-1][1]
+        ):
+            last = blocks.pop()
+            blocks[-1][0] += last[0]
+            blocks[-1][1] += last[1]
+            blocks[-1][2] = last[2]
+    uppers = [block[2] for block in blocks]
+    values = [block[0] / block[1] for block in blocks]
+    return lambda x: values[min(bisect_left(uppers, x), len(values) - 1)]
+
+
+def prevalence_table(recall: float, false_positive_rate: float) -> list[dict[str, Any]]:
+    """What a fixed recall and false-flag rate mean when toxic text is rare."""
+    table = []
+    for prevalence in PREVALENCES:
+        caught = prevalence * recall
+        wrong = (1 - prevalence) * false_positive_rate
+        table.append(
+            {
+                "prevalence": prevalence,
+                "flagged_per_1000": round(1000 * (caught + wrong), 1),
+                "toxic_among_flagged": (
+                    round(caught / (caught + wrong), 4) if caught + wrong else None
+                ),
+                "toxic_missed_per_1000": round(1000 * prevalence * (1 - recall), 1),
+            }
+        )
+    return table
+
+
+def calibration(
+    validation: tuple[list[float], list[int]], test: tuple[list[float], list[int]]
+) -> dict[str, Any]:
+    fitted = isotonic(*validation)
+    scores, labels = test
+    mapped = [fitted(score) for score in scores]
+    base_rate = sum(labels) / len(labels)
+    return {
+        "base_rate": round(base_rate, 4),
+        "brier_constant_prediction": round(base_rate * (1 - base_rate), 4),
+        "raw": {
+            "brier": round(brier(scores, labels), 4),
+            "ece": round(ece(scores, labels), 4),
+        },
+        "isotonic_fitted_on_validation": {
+            "brier": round(brier(mapped, labels), 4),
+            "ece": round(ece(mapped, labels), 4),
+        },
+        "reliability_raw": reliability(scores, labels),
+    }
+
+
 def evaluate(rows: list[Row], scores: list[float | None]) -> dict[str, Any]:
     failed = sum(score is None for score in scores)
     groups: dict[str, tuple[list[float], list[float]]] = {
@@ -309,6 +447,11 @@ def evaluate(rows: list[Row], scores: list[float | None]) -> dict[str, Any]:
         chosen["recall"]["value"] is not None
         and chosen["recall"]["value"] >= MIN_RECALL
     )
+    held_out = at_cutoff(test_pos, test_neg, review)
+
+    def labelled(pos: list[float], neg: list[float]) -> tuple[list[float], list[int]]:
+        return pos + neg, [1] * len(pos) + [0] * len(neg)
+
     return {
         "examples": {
             s: {"toxic": len(p), "clean": len(n)} for s, (p, n) in groups.items()
@@ -318,6 +461,7 @@ def evaluate(rows: list[Row], scores: list[float | None]) -> dict[str, Any]:
             "value": round(auc(test_pos, test_neg), 4),
             "ci95": bootstrap_auc(test_pos, test_neg),
         },
+        "auc_validation": round(auc(val_pos, val_neg), 4),
         "gate": {
             "max_false_positive_rate": MAX_FPR,
             "min_recall": MIN_RECALL,
@@ -325,8 +469,70 @@ def evaluate(rows: list[Row], scores: list[float | None]) -> dict[str, Any]:
             "met_on_validation": gate,
         },
         "test_at_reference_cutoff": at_cutoff(test_pos, test_neg, REFERENCE_CUTOFF),
-        "test_at_chosen_cutoff": at_cutoff(test_pos, test_neg, review),
+        "test_at_chosen_cutoff": held_out,
         "test_bands": bands(test_pos, test_neg, review, block),
+        "calibration": calibration(
+            labelled(val_pos, val_neg), labelled(test_pos, test_neg)
+        ),
+        "prevalence": prevalence_table(
+            held_out["recall"]["value"], held_out["false_positive_rate"]["value"]
+        ),
+    }
+
+
+def any_of(
+    rows: list[Row], scores: dict[str, list[float | None]], results: dict[str, Any]
+) -> dict[str, Any]:
+    """Flag when either of the two best models (by validation AUC) crosses its cutoff.
+
+    Each model gets half of the false-positive budget so the union stays near the
+    same budget as a single model. This is an experiment about what a multi-model
+    text policy could give; the service serves one text model today.
+    """
+    best = sorted(results, key=lambda m: results[m]["auc_validation"], reverse=True)[:2]
+    cutoffs = {}
+    for model in best:
+        pos = [
+            s
+            for r, s in zip(rows, scores[model], strict=True)
+            if s is not None and r.split == "validation" and r.positive
+        ]
+        neg = [
+            s
+            for r, s in zip(rows, scores[model], strict=True)
+            if s is not None and r.split == "validation" and not r.positive
+        ]
+        cutoffs[model] = cutoff_for(pos, neg, MAX_FPR / 2)
+    outcome: dict[str, dict[str, int]] = {
+        split: {"tp": 0, "fp": 0, "toxic": 0, "clean": 0}
+        for split in ("validation", "test")
+    }
+    for index, row in enumerate(rows):
+        values = [scores[model][index] for model in best]
+        if any(value is None for value in values):
+            continue
+        flagged = any(
+            value is not None and value >= cutoffs[model]
+            for model, value in zip(best, values, strict=True)
+        )
+        counts = outcome[row.split]
+        counts["toxic" if row.positive else "clean"] += 1
+        if flagged:
+            counts["tp" if row.positive else "fp"] += 1
+    summary = {
+        split: {
+            "recall": rate(c["tp"], c["toxic"]),
+            "false_positive_rate": rate(c["fp"], c["clean"]),
+        }
+        for split, c in outcome.items()
+    }
+    return {
+        "models": best,
+        "each_model_false_positive_budget": MAX_FPR / 2,
+        "cutoffs": {m: round(c, 4) for m, c in cutoffs.items()},
+        "validation": summary["validation"],
+        "test": summary["test"],
+        "best_single_on_test": {m: results[m]["test_at_chosen_cutoff"] for m in best},
     }
 
 
@@ -343,13 +549,16 @@ def render(report: dict[str, Any]) -> str:
         "",
         "Measured with `python -m evaluation.text`. Thresholds are chosen on a "
         "validation half and every figure below comes from the held-out half. "
-        "Ranges are 95% "
-        "confidence intervals. The two datasets are never pooled.",
+        "Ranges are 95% confidence intervals. The two datasets are never pooled.",
         "",
         f"**Target.** At most {MAX_FPR:.0%} of clean examples flagged and at least "
         f"{MIN_RECALL:.0%} of toxic ones caught, fixed before scoring. "
         "A model meets it only if the cutoff that holds false positives to "
         f"{MAX_FPR:.0%} on validation also reaches {MIN_RECALL:.0%} recall there.",
+        "",
+        "The main comparison and the bands were fixed before scoring. The calibration, "
+        "prevalence and two-model sections were added after seeing the first results, "
+        "so treat them as exploratory.",
         "",
     ]
     out += ["## Result", ""]
@@ -361,6 +570,22 @@ def render(report: dict[str, Any]) -> str:
         ]
         verdict = ", ".join(meeting) if meeting else "none of the models"
         out.append(f"- **{source}:** {verdict} met the target.")
+    out += [
+        "",
+        "## Models",
+        "",
+        "| Model | Task | Licence | Revision |",
+        "| --- | --- | --- | --- |",
+    ]
+    for model, spec in MODELS.items():
+        note = MODEL_NOTES[model]
+        out.append(
+            f"| {model} (`{spec['id']}`) | {note['task']} | {note['licence']} | "
+            f"`{spec['revision'][:12]}` |"
+        )
+    out.append("")
+    for model_id, reason in EXCLUDED.items():
+        out.append(f"Not evaluated: `{model_id}`, because {reason}.")
     out.append("")
     for source, data in report["sources"].items():
         spec = SOURCES[source]
@@ -373,8 +598,6 @@ def render(report: dict[str, Any]) -> str:
             f"{data['cohort']['conflicting_rows_dropped']} conflicting rows dropped, "
             f"{data['cohort']['too_long_excluded']} over the length limit excluded.",
             "",
-        ]
-        out += [
             "| Model | Held-out toxic / clean | ROC AUC | Recall @0.5 | "
             "False flags @0.5 | Recall @ validation cutoff | "
             "False flags @ validation cutoff | Meets target |",
@@ -412,7 +635,97 @@ def render(report: dict[str, Any]) -> str:
                 f"| {model} | {t['allow']} / {t['review']} / {t['block']} | "
                 f"{c['allow']} / {c['review']} / {c['block']} |"
             )
-        out.append("")
+        out += [
+            "",
+            "### Do the scores mean what they say?",
+            "",
+            "A score of 0.7 is only useful as a probability if about 70% of examples "
+            "scored near 0.7 are toxic. Brier score is the mean squared error of the "
+            "score as a probability (lower is better; a constant prediction of the "
+            "base rate scores the first figure below). Expected calibration error "
+            "(ECE) is the average gap between score and observed rate. The calibrated "
+            "columns map scores with isotonic regression fitted on the validation "
+            "half. A monotone map cannot change ranking, so AUC and the recall at a "
+            "given false-flag rate stay the same.",
+            "",
+            f"Base rate on the held-out half and Brier of a constant prediction: "
+            f"{next(iter(data['models'].values()))['calibration']['brier_constant_prediction']:.3f}.",
+            "",
+            "| Model | Brier raw | Brier calibrated | ECE raw | ECE calibrated |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for model, result in data["models"].items():
+            c = result["calibration"]
+            out.append(
+                f"| {model} | {c['raw']['brier']:.3f} | "
+                f"{c['isotonic_fitted_on_validation']['brier']:.3f} | "
+                f"{c['raw']['ece']:.3f} | "
+                f"{c['isotonic_fitted_on_validation']['ece']:.3f} |"
+            )
+        top = max(data["models"], key=lambda m: data["models"][m]["auc_test"]["value"])
+        out += [
+            "",
+            f"Reliability of the highest-AUC model ({top}), raw scores, held-out half:",
+            "",
+            "| Score range | Examples | Mean score | Actually toxic |",
+            "| --- | --- | --- | --- |",
+        ]
+        for item in data["models"][top]["calibration"]["reliability_raw"]:
+            low, high = item["range"]
+            out.append(
+                f"| {low:.1f}-{high:.1f} | {item['n']} | "
+                f"{item['mean_score']:.2f} | {item['observed']:.0%} |"
+            )
+        out += [
+            "",
+            "### What this means when toxic text is rare",
+            "",
+            "These test sets are about half toxic. Real traffic rarely is. Holding "
+            "each "
+            "model's held-out recall and false-flag rate fixed at the "
+            f"{MAX_FPR:.0%}-budget cutoff, this is what a reviewer would see per "
+            "1,000 items at different shares of toxic content. The last figure in each "
+            "cell is toxic items that slipped through.",
+            "",
+            "| Model | " + " | ".join(f"{p:.0%} toxic" for p in PREVALENCES) + " |",
+            "| --- | " + " | ".join("---" for _ in PREVALENCES) + " |",
+        ]
+        for model, result in data["models"].items():
+            cells = []
+            for item in result["prevalence"]:
+                share = item["toxic_among_flagged"]
+                cells.append(
+                    f"{item['flagged_per_1000']:.0f} flagged, "
+                    f"{'n/a' if share is None else f'{share:.0%}'} toxic, "
+                    f"{item['toxic_missed_per_1000']:.0f} missed"
+                )
+            out.append(f"| {model} | " + " | ".join(cells) + " |")
+        combo = data["combination"]
+        a, b = combo["models"]
+        out += [
+            "",
+            "### Does a second model help?",
+            "",
+            f"Flag an item if either {a} or {b} (the two best by validation AUC) "
+            "crosses its own cutoff, each held to "
+            f"{combo['each_model_false_positive_budget']:.1%} "
+            "false flags on validation. This is an experiment about what a multi-model "
+            "text policy could give. The service serves one text model, so this is "
+            "not a shipped feature.",
+            "",
+            "| Rule | Recall | False flags |",
+            "| --- | --- | --- |",
+        ]
+        for model, single in combo["best_single_on_test"].items():
+            out.append(
+                f"| {model} alone, 5% budget | {pct(single['recall'])} | "
+                f"{pct(single['false_positive_rate'])} |"
+            )
+        out += [
+            f"| Either of the two | {pct(combo['test']['recall'])} | "
+            f"{pct(combo['test']['false_positive_rate'])} |",
+            "",
+        ]
     out += [
         "## Limits",
         "",
@@ -422,7 +735,12 @@ def render(report: dict[str, Any]) -> str:
         "- Labels come from the datasets' own annotation, which has its own error. "
         "ToxiFrench uses a semi-automated pipeline with human checks, and ToxiGen "
         "uses model-generated text with human ratings.",
-        "- Deduplication is on normalised exact text only. Near-duplicates, shared "
+        "- Several models list the TextDetox multilingual toxicity data as training "
+        "data, and the Horizon models list Civil Comments. No evaluated card names "
+        "ToxiFrench or ToxiGen, but cards can be incomplete, so overlap with these "
+        "test sets is not ruled out.",
+        "- The split is a hash of the text, not time or author. Near-duplicates, "
+        "shared "
         "authors and overlap with a model's training data are not ruled out.",
         "- Dataset and model terms are their own. Check them before reuse.",
         "",
@@ -441,34 +759,68 @@ def prepare_models(cache: Path) -> None:
         )
 
 
+def load_scores(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text()) if path.exists() else {"sources": {}}
+
+
+def save_scores(path: Path, data: dict[str, Any]) -> None:
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(data) + "\n")
+    temporary.replace(path)
+
+
+def score_command(cache: Path, path: Path) -> None:
+    prepare_models(cache)
+    data = load_scores(path)
+    for source in SOURCES:
+        rows, cohort = build_cohort(source, cache)
+        entry = data["sources"].setdefault(source, {"scores": {}})
+        entry["cohort"] = cohort
+        entry["rows"] = [{"split": r.split, "positive": r.positive} for r in rows]
+        for model in MODELS:
+            if len(entry["scores"].get(model, [])) == len(rows):
+                continue
+            print(f"scoring {source} with {model} ({len(rows)} examples)", flush=True)
+            entry["scores"][model] = score_model(model, rows, cache)
+            save_scores(path, data)
+
+
+def report_command(path: Path, json_path: Path, markdown: Path) -> None:
+    data = load_scores(path)
+    report: dict[str, Any] = {"sources": {}}
+    for source, entry in data["sources"].items():
+        rows = [Row("", r["positive"], r["split"]) for r in entry["rows"]]
+        results = {
+            model: evaluate(rows, entry["scores"][model])
+            for model in MODELS
+            if model in entry["scores"]
+        }
+        report["sources"][source] = {
+            "cohort": entry["cohort"],
+            "models": results,
+            "combination": any_of(rows, entry["scores"], results),
+        }
+    json_path.write_text(json.dumps(report, indent=2) + "\n")
+    markdown.write_text(render(report))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cache", type=Path, help="model and dataset cache directory")
-    parser.add_argument("--json", type=Path, required=True)
-    parser.add_argument("--markdown", type=Path, required=True)
-    parser.add_argument(
-        "--from-json",
-        action="store_true",
-        help="render --markdown from an existing --json without scoring anything",
+    commands = parser.add_subparsers(dest="command", required=True)
+    score = commands.add_parser(
+        "score", help="run the models and save raw scores (resumable)"
     )
+    score.add_argument("--cache", type=Path, required=True)
+    score.add_argument("--scores", type=Path, required=True)
+    report = commands.add_parser("report", help="compute the report from saved scores")
+    report.add_argument("--scores", type=Path, required=True)
+    report.add_argument("--json", type=Path, required=True)
+    report.add_argument("--markdown", type=Path, required=True)
     args = parser.parse_args()
-    if args.from_json:
-        args.markdown.write_text(render(json.loads(args.json.read_text())))
-        return
-    if args.cache is None:
-        parser.error("--cache is required unless --from-json is given")
-    prepare_models(args.cache)
-    report: dict[str, Any] = {"sources": {}}
-    for source in SOURCES:
-        rows, cohort = build_cohort(source, args.cache)
-        report["sources"][source] = {"cohort": cohort, "models": {}}
-        for model in MODELS:
-            print(f"scoring {source} with {model} ({len(rows)} examples)", flush=True)
-            report["sources"][source]["models"][model] = evaluate(
-                rows, score_model(model, rows, args.cache)
-            )
-    args.json.write_text(json.dumps(report, indent=2) + "\n")
-    args.markdown.write_text(render(report))
+    if args.command == "score":
+        score_command(args.cache, args.scores)
+    else:
+        report_command(args.scores, args.json, args.markdown)
 
 
 if __name__ == "__main__":
