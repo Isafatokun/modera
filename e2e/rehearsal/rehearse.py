@@ -13,12 +13,13 @@ import time
 from collections.abc import Callable
 from contextlib import ExitStack, suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx2 as httpx
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
+PROC = Path("/proc")
 Request = tuple[subprocess.Popen[str], Path, Path]
 
 
@@ -95,16 +96,41 @@ def listener_socket(port: int) -> str:
     raise RuntimeError("gateway listening socket was not found")
 
 
-def owns_socket(pid: int, target: str) -> bool:
-    """A draining worker may live on, but must stop accepting new connections."""
+class Worker(NamedTuple):
+    """A process named by PID and start time, so a reused PID is not mistaken for it."""
+
+    pid: int
+    started: str
+
+
+def start_time(pid: int, proc: Path = PROC) -> str | None:
     try:
-        descriptors = list(Path(f"/proc/{pid}/fd").iterdir())
+        stat = (proc / str(pid) / "stat").read_text()
     except (FileNotFoundError, ProcessLookupError):
+        return None
+    # The command name is in parentheses and may itself contain spaces or
+    # parentheses, so count fields from the last closing one. Start time is field 22.
+    return stat.rsplit(")", 1)[1].split()[19]
+
+
+def owns_socket(worker: Worker, target: str, proc: Path = PROC) -> bool:
+    """A draining worker may live on, but must stop accepting new connections.
+
+    A worker that has exited, or whose PID now belongs to another process, owns
+    nothing. If its descriptors cannot be read right now, it is probably exiting, so
+    report that it still owns the socket and let the caller keep polling. Failing to
+    inspect a worker is never taken as proof that it closed the listener.
+    """
+    if start_time(worker.pid, proc) != worker.started:
         return False
-    for descriptor in descriptors:
-        with suppress(FileNotFoundError, ProcessLookupError):
+    try:
+        for descriptor in (proc / str(worker.pid) / "fd").iterdir():
             if os.readlink(descriptor) == target:
                 return True
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    except PermissionError:
+        return True
     return False
 
 
@@ -215,15 +241,15 @@ class Rehearsal:
         until(ready, f"instance {name} readiness timed out", 180)
 
     def route(self, names: list[str]) -> None:
-        old_workers: list[int] = []
+        old_workers: list[Worker] = []
         listener = ""
         if self.gateway is not None:
             master = self.gateway.pid
+            children = Path(f"/proc/{master}/task/{master}/children").read_text()
             old_workers = [
-                int(pid)
-                for pid in Path(f"/proc/{master}/task/{master}/children")
-                .read_text()
-                .split()
+                Worker(int(pid), started)
+                for pid in children.split()
+                if (started := start_time(int(pid))) is not None
             ]
             require(old_workers, "gateway has no worker processes")
             listener = listener_socket(self.port)
@@ -258,7 +284,7 @@ class Rehearsal:
 
         until(routed, "new gateway configuration was not acknowledged")
         until(
-            lambda: all(not owns_socket(pid, listener) for pid in old_workers),
+            lambda: all(not owns_socket(worker, listener) for worker in old_workers),
             "old gateway workers still accept new connections",
         )
 
