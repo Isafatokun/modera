@@ -307,11 +307,9 @@ class ModerationEngine:
         )
         if adapter is None:
             raise APIError(
-                503,
-                "check_unavailable",
-                "The model is unavailable.",
-                retryable=True,
-                headers={"Retry-After": "1"},
+                500,
+                "model_not_loaded",
+                "A required model is not loaded; the service needs operator action.",
             )
         if not attribute:
             return await worker.run(partial(adapter.predict, content))
@@ -321,12 +319,13 @@ class ModerationEngine:
         return [finding.model_copy(update={"model": selection.id}) for finding in found]
 
     def _falls_back(self, input_type: InputType, error: APIError) -> bool:
-        return (
-            input_type == TEXT
-            and self._settings.text_fallback == "rules"
-            and error.status_code == 503
-            and error.code == "check_unavailable"
-        )
+        if input_type != TEXT or self._settings.text_fallback != "rules":
+            return False
+        if error.code == "model_not_loaded":
+            # Retrying cannot help, so fall back only when there is a policy to fall
+            # back to. Otherwise report the fault instead of a retryable error.
+            return self._fallback_policy is not None
+        return error.status_code == 503 and error.code == "check_unavailable"
 
     @staticmethod
     def _predict_image(

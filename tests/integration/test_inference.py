@@ -531,3 +531,91 @@ def test_busy_text_worker_is_not_treated_as_a_model_outage(
         finally:
             release.set()
             first.join(10)
+
+
+def failed_to_load(
+    settings: TextModelSettings | ImageModelSettings, threads: int
+) -> FakeClassifier:
+    raise OSError("private model path")
+
+
+def text_model() -> TextModelSettings:
+    return TextModelSettings(
+        id="example/model", revision=REVISION, label_map={"toxic": "toxicity"}
+    )
+
+
+def test_model_that_never_loaded_is_not_retryable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    """Only a restart can fix this, so a caller must not be told to retry."""
+    monkeypatch.setattr(engine, "create_adapter", failed_to_load)
+    settings = Settings(
+        **configuration(tmp_path, model_required=True),
+        text_model=text_model(),
+        text_fallback="rules",
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 500
+    error = response.json()["error"]
+    assert error["code"] == "model_not_loaded"
+    assert error["retryable"] is False
+    assert "Retry-After" not in response.headers
+    assert "decision" not in response.json()
+    assert "private model path" not in response.text
+
+
+def test_model_that_never_loaded_falls_back_when_a_policy_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    values = configuration(tmp_path, model_required=True)
+    payload = json.loads(values["policy_file"].read_text())
+    payload["policies"].append(
+        {
+            "id": "degraded",
+            "version": "2",
+            "text": [{"category": "rules.blocklist", "block_threshold": 1.0}],
+        }
+    )
+    values["policy_file"].write_text(json.dumps(payload))
+    monkeypatch.setattr(engine, "create_adapter", failed_to_load)
+    settings = Settings(
+        **values,
+        text_model=text_model(),
+        text_fallback="rules",
+        text_fallback_policy="degraded",
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        response = client.post(
+            "/v1/moderations",
+            json={"input": {"type": "text", "text": "blocked phrase"}},
+        )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["fallback"] and result["models"] == []
+    assert result["policy"] == {"id": "degraded", "version": "2"}
+    assert result["decision"]["action"] == "block"
+
+
+def test_failing_but_loaded_model_is_still_retryable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_headers: dict[str, str]
+) -> None:
+    """A loaded model that errors may recover, so this stays a retryable 503."""
+    monkeypatch.setattr(engine, "create_adapter", FakeClassifier)
+    settings = Settings(
+        **configuration(tmp_path, model_required=True),
+        text_model=text_model(),
+        text_fallback="rules",
+    )
+    with TestClient(create_app(settings), headers=auth_headers) as client:
+        monkeypatch.setattr(FakeClassifier, "fail", True)
+        response = client.post(
+            "/v1/moderations", json={"input": {"type": "text", "text": "hello"}}
+        )
+    assert response.status_code == 503
+    error = response.json()["error"]
+    assert error["code"] == "check_unavailable" and error["retryable"] is True
+    assert response.headers["Retry-After"]
