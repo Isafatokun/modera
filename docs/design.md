@@ -272,8 +272,7 @@ this is an experiment and not a shipped feature.
 Over 500 tests run on every change. They call the API in process and cover policies,
 limits, error classification, queues, overload and shutdown, model loading with small
 generated models, and the hardened container. The Go client has unit tests with the race
-detector, a live check against the real API (`clients/go/integration.py`), and a CI step
-that installs it into a fresh module. A Compose smoke test (`e2e/reference/verify.py`)
+detector. A Compose smoke test (`e2e/reference/verify.py`)
 starts the reference setup from an empty cache with the real checkpoints.
 
 A heavier rehearsal also existed, driving the Go client through NGINX to two real-model
@@ -302,9 +301,10 @@ the Go result validator, `Retry-After` parsing) tests were written first.
   on one runner, and graceful shutdown is tested at process level. Your load balancer,
   TLS and termination controller are not.
 - **Production capacity.** Nothing here measures throughput or latency under load.
-- **A real integration.** The example application in `clients/go/cmd/moderate` shows a
-  caller treating a failed check as `pending` and never as `allow`, but no product uses
-  Modera yet.
+- **A real integration.** The reference upload gate (`examples/upload_gate.py`) shows a
+  caller treating a failed check as `pending` and never as `allow`, and its tests drive
+  it against a real Modera process, but no product uses Modera yet. The Go client is
+  only unit-tested; it has no live check against the API.
 
 ## Trade-offs at a glance
 

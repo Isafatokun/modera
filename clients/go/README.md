@@ -12,12 +12,9 @@ a reviewed commit, and let Go work out the pseudo-version:
 go get github.com/Isafatokun/modera/clients/go@main
 ```
 
-CI installs every pull request's exact head into a fresh module and compiles all three
-methods. Run the same check with
-`uv run --locked python clients/go/consumer_check.py --revision FULL_COMMIT_SHA`.
-
-For a complete program that maps results to publish, review, reject and pending, see
-the [example application](cmd/moderate/README.md).
+For an application that maps results to publish, review, reject and pending, see the
+[reference upload gate](../../examples/upload_gate.py); it is written in Python but
+follows the same rules the client's result types support.
 
 ## Use
 
@@ -110,8 +107,4 @@ go vet ./...
 go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
 ```
 
-`uv run --locked python clients/go/integration.py` from the repository root starts the
-real rules-only API on a loopback port with a fresh key and runs the client against it.
-It covers block and allow, provenance, distinct request IDs, an uploaded image, an
-unconfigured image backend, a disallowed URL and authentication. CI also runs the
-module with Go 1.23.12 to check the minimum version.
+CI also runs the module with Go 1.23.12 to check the minimum version.

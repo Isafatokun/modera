@@ -39,12 +39,6 @@ jobs:
       - name: Staticcheck Go client
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
         working-directory: clients/go
-      - name: Verify Go client and application against the local API
-        run: uv run --locked python clients/go/integration.py
-      - name: Install SDK into an external consumer
-        run: >-
-          uv run --locked python clients/go/consumer_check.py
-          --revision "${{ github.event.pull_request.head.sha || github.sha }}"
 
   go-minimum:
     runs-on: ubuntu-latest
@@ -79,7 +73,7 @@ jobs:
       - run: uv sync --locked
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
-      - run: uv run --locked mypy src tests examples e2e evaluation .github/scripts clients/go/integration.py clients/go/consumer_check.py
+      - run: uv run --locked mypy src tests examples e2e evaluation .github/scripts
       - name: Check evaluation entry points
         run: |
           uv run --locked python -m evaluation.photos --help

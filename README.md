@@ -65,8 +65,9 @@ For real text and photo models, use the [Docker Compose setup](deploy/reference/
   loaded offline.
 - Exposes health checks and Prometheus metrics, bounds its queues, and drains
   requests on shutdown.
-- Ships a [Go client](clients/go/README.md) and a runnable
-  [example application](clients/go/cmd/moderate/README.md).
+- Ships a [Go client](clients/go/README.md) and a tested
+  [reference upload gate](examples/upload_gate.py) showing how an application keeps
+  an upload private until a completed decision arrives.
 
 Modera does not publish content, keep a review queue or store results. Your
 application owns those, including retrying safely: a retry is a new evaluation.
@@ -105,8 +106,10 @@ on their own; see [accuracy](docs/accuracy.md).
 - Over 500 tests run on every change, calling the API in process: policies, limits, error
   classification, queues, overload and shutdown, model loading with small generated
   models, and the hardened container.
-- The Go client has unit tests with the race detector and a live check against the real
-  API, and CI installs it into a fresh module.
+- The Go client has unit tests with the race detector. It has no live check against the
+  API.
+- The reference upload gate is tested against a real Modera process with a stalled
+  model.
 - A Compose smoke test starts the reference setup from an empty cache with the real
   checkpoints.
 - [Accuracy](docs/accuracy.md) is measured separately, on public labelled text.

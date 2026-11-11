@@ -122,7 +122,7 @@ result, is an error and never an allow, and a block threshold wins over a review
 
 Text fallback is optional. When it applies, the result has `fallback: true`, and the
 policy and coverage are those of the reduced rules-only evaluation. Decide how your
-application treats reduced coverage; the [Go example](../clients/go/cmd/moderate/README.md)
+application treats reduced coverage; the [reference upload gate](../examples/upload_gate.py)
 sends a fallback `allow` to review and keeps a fallback `block` rejected.
 
 ## Errors
