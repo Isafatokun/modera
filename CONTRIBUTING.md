@@ -38,8 +38,8 @@ For the Go client, run `go test -race ./...` and `go vet ./...` in `clients/go`.
 - Update the docs when behaviour changes, and keep them to the point.
 - Say what you ran, and what you could not run, in the pull request.
 - Model accuracy is not something unit tests can show. Do not claim it without
-  evidence from your own labelled data, and see the
-  [evaluation harness](evaluation/README.md).
+  evidence from your own labelled data. A text-evaluation harness is kept at the
+  `evaluation-archive` git tag.
 
 [AGENTS.md](AGENTS.md) describes the review passes the maintainers apply before a change
 is published.

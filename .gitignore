@@ -13,7 +13,4 @@ build/
 .env.*
 !.env.example
 model-cache/
-evaluation/data/
-evaluation/results/
-reference-verification/
 

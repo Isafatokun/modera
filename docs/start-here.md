@@ -5,29 +5,29 @@ Pick a path. Both bind to localhost.
 | Goal | Start with | Needs |
 | --- | --- | --- |
 | Try requests and decisions | [Quick start](../README.md#quick-start) | Python 3.12 and uv, no model download |
-| Run real text and photo models | the Docker Compose setup below | Docker Compose v2, about 0.6 GiB of weights on first run |
+| Run real text and photo models | [Real models](#real-models) | Python 3.12, uv and about 0.6 GiB of weights on first run |
 | Connect your backend | [Go client](../clients/go/README.md) or [API](api.md) | A running service and its key |
 
 The rules demo matches example phrases and shows nothing about model quality or photo
-moderation. The Compose setup uses pinned example models and thresholds that are not a
+moderation. The example models are pinned, and the example thresholds are not a
 recommendation for your content. Neither path measures capacity or accuracy.
 
-## Real models with Docker Compose
+## Real models
 
-From a checkout, with Docker running:
+Install the CPU dependencies, prepare the pinned weights once, then start the service:
 
 ```sh
+uv sync --locked --extra inference
+uv run --locked --extra inference python -m modera.prepare_models --config examples/models.json
 export MODERA_API_KEY="$(openssl rand -hex 32)"
-docker compose up --build --force-recreate --wait --wait-timeout 600
-docker compose --profile checks run --rm --no-deps check
+export MODERA_MODEL_FILE=examples/models.json
+export MODERA_POLICY_FILE=examples/policies.json
+uv run --locked --extra inference uvicorn modera.main:create_app --factory
 ```
 
-A preparation container downloads and warms the models, and the service then reads the
-cached weights without touching the network. The check sends neutral text and a
-generated white image. It proves the API works, not that harmful content is detected.
-`docker compose down` stops it and keeps the weights for next time.
-
-Upload a photo with the same shell:
+Preparation downloads and warms the models, and the service then reads the cached weights
+without touching the network. The example models and thresholds are placeholders; see
+[Models](models.md#set-up-classifiers). Upload a photo with the same shell:
 
 ```sh
 curl http://127.0.0.1:8000/v1/moderations \
@@ -35,8 +35,9 @@ curl http://127.0.0.1:8000/v1/moderations \
   -F 'file=@./photo.jpg'
 ```
 
-Uploads need no URL allowlist. To fetch remote photos, allow the host as described in
-the [reference setup](../deploy/reference/README.md#url-checks).
+Uploads need no URL allowlist. To fetch remote photos, allow the host with
+`MODERA_IMAGE_ALLOWED_HOSTS`, as described in the [API](api.md). A container build is
+described in [Models](models.md) and [Operations](operations.md).
 
 ## Reading the response
 
@@ -53,8 +54,8 @@ only shows how the configured policy ran. See [using the result](api.md#using-th
 
 | Symptom | Check |
 | --- | --- |
-| Never becomes ready | `docker compose logs prepare modera`: download access, disk space, and the configuration error (redact secrets before sharing). |
-| Port 8000 is taken | Set `MODERA_PORT=8001`, restart, and use that port. |
+| Never becomes ready | The service log and the `prepare_models` output: download access, disk space, and the configuration error (redact secrets before sharing). |
+| Port 8000 is taken | Start uvicorn with `--port 8001` and use that port. |
 | `401` | Use the key from the shell that started the service, and never put a key in a URL. |
 | `501` | That input type has no backend. The rules demo handles text only. |
 | Photo URL fails | Check the exact allowed hostname and that the source is HTTPS. Try an upload to separate fetching from inference. |
@@ -65,8 +66,7 @@ only shows how the configured policy ran. See [using the result](api.md#using-th
 
 Evaluate models and policies on your own inputs. Set up HTTPS, network access, secret
 management and monitoring, measure capacity on your hardware, and test overload,
-restart and shutdown. The [operations guide](operations.md) and
-[reference setup](../deploy/reference/README.md) cover the details.
+restart and shutdown. The [operations guide](operations.md) covers the details.
 
 ## Generate a rules demo of your own
 

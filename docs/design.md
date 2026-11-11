@@ -201,7 +201,8 @@ and this service has no equivalent hazard.
 ## What the text measurements show
 
 Everything here comes from [`docs/accuracy.md`](accuracy.md), produced by
-`python -m evaluation.text` and reproducible from the saved raw scores. Six pinned
+`python -m evaluation.text`, reproducible from the saved raw scores. That harness was
+removed from the tree and is kept at the `evaluation-archive` git tag. Six pinned
 models were scored on two public human-labelled datasets, ToxiFrench (French) and the
 human-rated ToxiGen subset (English), through the real serving path. Cutoffs came from a
 validation half. Every figure is from the held-out half. The target was fixed up front:
@@ -258,11 +259,10 @@ this is an experiment and not a shipped feature.
 - Treat the 90% / 5% target as unmet and stop describing the reference text policy as
   adequate. Its review cutoff of 0.5 is uncalibrated and, on both datasets, catches little
   while flagging more clean text than the 5% budget.
-- Run `python -m evaluation.cutoffs` on each product's own labelled sample, since that is
-  the only number that predicts that product. It picks cutoffs on one half, reports the
-  other half with intervals, and writes a policy that Modera's own loader accepts. It
-  reproduces this study's numbers for the reference model exactly. Budget human review
-  against the prevalence-adjusted false-alarm rate it prints.
+- Choose cutoffs on each product's own labelled sample, since that is the only number
+  that predicts that product, and budget human review against the prevalence-adjusted
+  false-alarm rate. A command for this (`evaluation.cutoffs`) is kept at the
+  `evaluation-archive` git tag.
 - Measure photos. Nothing in this section applies to them.
 - Try stronger models and a different second opinion against the same pre-registered
   protocol, and report the result whichever way it goes.
@@ -272,8 +272,9 @@ this is an experiment and not a shipped feature.
 Over 500 tests run on every change. They call the API in process and cover policies,
 limits, error classification, queues, overload and shutdown, model loading with small
 generated models, and the hardened container. The Go client has unit tests with the race
-detector. A Compose smoke test (`e2e/reference/verify.py`)
-starts the reference setup from an empty cache with the real checkpoints.
+detector. A Compose smoke test with the real checkpoints and the evaluation harness
+were removed to keep the repository small; they are kept at the `evaluation-archive`
+git tag.
 
 A heavier rehearsal also existed, driving the Go client through NGINX to two real-model
 processes to exercise drain, restart and forced termination. It was removed from the tree
@@ -295,9 +296,9 @@ the Go result validator, `Retry-After` parsing) tests were written first.
 
 - **Moderation accuracy for your content.** Text accuracy is measured on two public
   datasets (above), and the target is not met. Photo accuracy has not been measured at
-  all. The [photo harness](../evaluation/README.md) exists for that, and either harness
+  all. A photo harness is kept at the `evaluation-archive` git tag, and either harness
   should be run on your own labelled sample before a policy acts on real content.
-- **Behaviour on your platform.** The container and Compose checks cover one container
+- **Behaviour on your platform.** The container checks cover one container
   on one runner, and graceful shutdown is tested at process level. Your load balancer,
   TLS and termination controller are not.
 - **Production capacity.** Nothing here measures throughput or latency under load.

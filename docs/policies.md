@@ -16,8 +16,8 @@ IDs must be unique; categories must be unique within each input type.
 At least one rule per policy and one threshold per rule are required. Thresholds
 must be finite numbers in [0, 1]; review must be lower than block when both exist.
 Unknown fields and invalid types are rejected. Omit a rule to remove that check.
-Example thresholds are placeholders. Choose yours from your own labelled sample with
-`python -m evaluation.cutoffs`, described in [evaluation](../evaluation/README.md).
+Example thresholds are placeholders. Choose yours from your own labelled sample. A cutoff-selection command is kept at
+the `evaluation-archive` git tag.
 
 ## Evaluation
 

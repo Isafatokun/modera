@@ -1,6 +1,6 @@
 # Text accuracy
 
-Measured with `python -m evaluation.text`. Thresholds are chosen on a validation half and every figure below comes from the held-out half. Ranges are 95% confidence intervals. The two datasets are never pooled.
+Measured with `python -m evaluation.text`, which was removed from the tree and is kept, with its saved raw scores, at the `evaluation-archive` git tag. Thresholds are chosen on a validation half and every figure below comes from the held-out half. Ranges are 95% confidence intervals. The two datasets are never pooled.
 
 **Target.** At most 5% of clean examples flagged and at least 90% of toxic ones caught, fixed before scoring. A model meets it only if the cutoff that holds false positives to 5% on validation also reaches 90% recall there.
 

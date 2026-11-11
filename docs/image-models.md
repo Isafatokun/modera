@@ -99,7 +99,6 @@ uv run --locked --extra onnx python -m modera.prepare_models \
 Set `MODERA_MODEL_FILE` to your model file and `MODERA_POLICY_FILE` to your policy;
 use the usual bearer key and serving command. See [Start here](start-here.md).
 For a container, add `--build-arg ONNX=true`; add `INFERENCE=true` too when needed.
-The reference Compose setup accepts `MODERA_ONNX=true` to include the extra.
 
 ## Combine image models
 

@@ -51,7 +51,7 @@ curl http://127.0.0.1:8000/v1/moderations \
 }
 ```
 
-For real text and photo models, use the [Docker Compose setup](deploy/reference/README.md).
+For real text and photo models, see [Models](docs/models.md#set-up-classifiers).
 [Start here](docs/start-here.md) covers both paths and common problems.
 
 ## What it does
@@ -99,7 +99,6 @@ on their own; see [accuracy](docs/accuracy.md).
 | [Photo models](docs/image-models.md) | Detectors, ONNX and combining several photo models |
 | [Operations](docs/operations.md) | Deployment, metrics, key rotation and overload |
 | [Accuracy](docs/accuracy.md) | Measured text accuracy, calibration and review load |
-| [Evaluation](evaluation/README.md) | Reproducing the text numbers, and checking a policy on your own photos |
 
 ## How it's tested
 
@@ -110,11 +109,11 @@ on their own; see [accuracy](docs/accuracy.md).
   API.
 - The reference upload gate is tested against a real Modera process with a stalled
   model.
-- A Compose smoke test starts the reference setup from an empty cache with the real
-  checkpoints.
-- [Accuracy](docs/accuracy.md) is measured separately, on public labelled text.
+- [Accuracy](docs/accuracy.md) was measured separately, on public labelled text. The
+  harness that produced it was removed to keep this repository small and is kept at
+  the `evaluation-archive` git tag.
 
-Not covered: photo accuracy, your platform's load balancer and termination, and
+Not covered: photo accuracy, real-model serving speed, your platform's load balancer and termination, and
 production capacity. Nothing here measures throughput.
 
 ## Development
