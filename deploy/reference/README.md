@@ -64,7 +64,9 @@ so keep the upstream notices if you redistribute them.
 
 The photo policy blocks when `porn` or `hentai` reaches 0.95, and the `sexy` output
 triggers nothing. Text review and block thresholds are 0.5 and 0.85. All of these are
-illustrative and uncalibrated. In a small local check at 0.95 the photo model got 8 of 9
+illustrative and uncalibrated. For text, `python -m evaluation.cutoffs` chooses cutoffs
+from your own labelled sample (see [evaluation](../../evaluation/README.md)); nothing
+here does that for photos yet. In a small local check at 0.95 the photo model got 8 of 9
 nude images right and flagged none of 17 others, but it missed one nude artwork, and
 across 36 transformed copies it missed four and flagged one clean image. Those samples
 are tiny and correlated, and the fixtures are not in this repository.

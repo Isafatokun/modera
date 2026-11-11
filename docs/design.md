@@ -258,9 +258,11 @@ this is an experiment and not a shipped feature.
 - Treat the 90% / 5% target as unmet and stop describing the reference text policy as
   adequate. Its review cutoff of 0.5 is uncalibrated and, on both datasets, catches little
   while flagging more clean text than the 5% budget.
-- Run the harness on each product's own labelled sample, since that is the only number
-  that predicts that product. Choose cutoffs there and budget human review against the
-  prevalence-adjusted false-alarm rate.
+- Run `python -m evaluation.cutoffs` on each product's own labelled sample, since that is
+  the only number that predicts that product. It picks cutoffs on one half, reports the
+  other half with intervals, and writes a policy that Modera's own loader accepts. It
+  reproduces this study's numbers for the reference model exactly. Budget human review
+  against the prevalence-adjusted false-alarm rate it prints.
 - Measure photos. Nothing in this section applies to them.
 - Try stronger models and a different second opinion against the same pre-registered
   protocol, and report the result whichever way it goes.
@@ -324,6 +326,7 @@ the Go result validator, `Retry-After` parsing) tests were written first.
    has not been merged.
 2. Measure photo accuracy with the same protocol as text, on a labelled set you choose,
    and decide which policy to pilot.
-3. Revisit the reference text policy in light of the measurements above: pick a better
-   model or operating point, or say plainly that it is a demo.
+3. Replace the reference text policy's placeholder thresholds with ones chosen by the
+   cutoffs command on data that resembles your traffic, or keep saying plainly that they
+   are a demo.
 4. Decide whether to keep the ONNX research candidate, whose model licence is unresolved.

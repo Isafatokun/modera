@@ -24,6 +24,34 @@ runs them, and saves raw scores with no text in them. It resumes if interrupted.
 `report` recomputes every table from those scores in seconds, so the statistics can be
 checked or extended without rerunning the models.
 
+## Cutoffs for your own text
+
+`evaluation/cutoffs.py` turns your labelled sample into a policy. The study above shows
+that good cutoffs differ by model, and for some models by dataset: across six models and
+two datasets they ranged from 0.35 to 0.998. A cutoff from someone else's data is a guess.
+
+```sh
+uv run --locked --extra inference python -m evaluation.cutoffs \
+  --model-file models.json --data sample.jsonl \
+  --policy-out policy.json --report-out report.md
+```
+
+- `--model-file` is a Modera [model file](../docs/models.md) with a `text` model.
+- The sample is `.jsonl` (`{"text": "...", "toxic": true}` per line) or `.csv` with `text`
+  and `toxic` columns. Exact duplicates are collapsed and conflicting labels dropped.
+- Each half of the sample needs at least 50 toxic and 50 clean examples, or the command
+  refuses, because a 5% false-flag rate cannot be measured on fewer.
+- Cutoffs are chosen on one half, picked by a hash of the text. The report's figures all
+  come from the other half, with 95% intervals and the review load at 1%, 5% and 20% toxic
+  traffic.
+- `policy.json` has a review cutoff that holds false flags to 5% and, when it can be told
+  apart, a block cutoff that holds them to 1%. It is checked against Modera's policy
+  schema before it is written, and it will not overwrite an existing file.
+- It says whether the 90% recall / 5% false-flag target was met. It refuses outright if no
+  useful cutoff exists, since a policy that never flags anything would mislead.
+
+On the French study data this reproduces the study's reference-model numbers exactly.
+
 ## Photo evaluation
 
 Check a policy on your own labelled photos before it acts on real content. The

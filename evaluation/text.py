@@ -196,8 +196,13 @@ def build_cohort(name: str, cache: Path) -> tuple[list[Row], dict[str, int]]:
 
 
 def score_model(model: str, rows: list[Row], cache: Path) -> list[float | None]:
-    """Score every row through Modera's real serving path, in process."""
     spec = {**MODELS[model], "cache_dir": cache / "hub"}
+    return score_text(TextModelSettings.model_validate(spec), rows)
+
+
+def score_text(model: TextModelSettings, rows: list[Row]) -> list[float | None]:
+    """Score every row through Modera's real serving path, in process."""
+    category = next(iter(model.label_map.values()))
     with tempfile.TemporaryDirectory() as directory:
         policy = Path(directory) / "policy.json"
         policy.write_text(
@@ -206,14 +211,8 @@ def score_model(model: str, rows: list[Row], cache: Path) -> list[float | None]:
                     "policies": [
                         {
                             "id": "default",
-                            "version": "accuracy-1",
-                            "text": [
-                                {
-                                    "category": "toxicity",
-                                    "review_threshold": 0.5,
-                                    "block_threshold": 0.85,
-                                }
-                            ],
+                            "version": "scoring-only",
+                            "text": [{"category": category, "review_threshold": 0.5}],
                         }
                     ]
                 }
@@ -221,9 +220,7 @@ def score_model(model: str, rows: list[Row], cache: Path) -> list[float | None]:
         )
         key = secrets.token_urlsafe(32)
         settings = Settings(
-            api_key=SecretStr(key),
-            policy_file=policy,
-            text_model=TextModelSettings.model_validate(spec),
+            api_key=SecretStr(key), policy_file=policy, text_model=model
         )
         scores: list[float | None] = []
         with TestClient(
@@ -240,7 +237,7 @@ def score_model(model: str, rows: list[Row], cache: Path) -> list[float | None]:
                 findings = {
                     f["category"]: f["score"] for f in response.json()["findings"]
                 }
-                scores.append(findings["toxicity"])
+                scores.append(findings[category])
     return scores
 
 
