@@ -36,7 +36,7 @@ onnx = [
 ]
 
 [dependency-groups]
-benchmark = [
+loadtest = [
     "httpx2>=2.16.0",
     "numpy>=2,<3",
 ]
@@ -77,8 +77,8 @@ max-statements = 35
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["C901", "PLR0915"]
-"benchmarks/**" = ["C901", "PLR0915"]
-"deploy/**" = ["C901", "PLR0915"]
+"loadtests/**" = ["C901", "PLR0915"]
+"e2e/**" = ["C901", "PLR0915"]
 "examples/**" = ["C901", "PLR0915"]
 "evaluation/**" = ["C901", "PLR0915"]
 "clients/**" = ["C901", "PLR0915"]

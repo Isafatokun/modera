@@ -9,7 +9,7 @@ From the repository root, with Go 1.27.3 and NGINX installed:
 
 ```sh
 uv sync --locked --extra inference
-uv run --locked --extra inference python deploy/rehearsal/rehearse.py \
+uv run --locked --extra inference python e2e/rehearsal/rehearse.py \
   --nginx /usr/sbin/nginx --download \
   --cache-dir model-cache/hub --output rehearsal-verification
 ```

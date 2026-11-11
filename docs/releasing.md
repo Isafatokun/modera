@@ -12,7 +12,7 @@ Before cutting a release:
   validate the policy on representative photos with the
   [evaluation harness](../evaluation/README.md).
 - Check the target deployment's ingress removal and termination deadline. The
-  [rehearsal](../deploy/rehearsal/README.md) proves the process behaviour on a Linux
+  [rehearsal](../e2e/rehearsal/README.md) proves the process behaviour on a Linux
   runner, not your platform.
 
 ## Go client

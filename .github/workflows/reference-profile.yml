@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/reference-profile.yml'
-      - 'deploy/reference/verify.py'
+      - 'e2e/reference/verify.py'
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify real models from an empty cache
-        run: python3 deploy/reference/verify.py --output reference-verification
+        run: python3 e2e/reference/verify.py --output reference-verification
       - name: Save verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx2 as httpx
 import pytest
 
-from deploy.rehearsal.rehearse import until
+from e2e.rehearsal.rehearse import until
 
 
 @pytest.mark.inference
@@ -39,7 +39,7 @@ def test_rehearsal_exit_fault_is_explicit(
         port = listener.getsockname()[1]
         args = [
             sys.executable,
-            str(root / "deploy/rehearsal/bootstrap.py"),
+            str(root / "e2e/rehearsal/bootstrap.py"),
             "--fd",
             str(listener.fileno()),
             "--control",
