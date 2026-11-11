@@ -17,6 +17,20 @@ tested catches 90% of toxic text at 5% false flags. The best catch 32% (French) 
 (English) at about 5%. See [accuracy](docs/accuracy.md). Photo accuracy is unmeasured,
 and no product uses Modera yet.
 
+## How it works
+
+```mermaid
+flowchart TD
+    A["Your app sends text or a photo and selects a policy"] --> B["Modera validates the request and runs the required model or phrase checks"]
+    B --> C["Policy evaluates the findings"]
+    C --> D["Your app receives allow, review, or block with the findings"]
+    B --> E["If a required check cannot finish, Modera returns an error"]
+```
+
+Your app owns publication and human review. If a request fails, the app can keep
+the content pending and use the [error details](docs/api.md#errors) to decide whether
+to retry.
+
 ## Quick start
 
 You need Python 3.12 and [uv](https://docs.astral.sh/uv/getting-started/installation/).
